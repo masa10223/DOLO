@@ -227,22 +227,22 @@ def create_yolo_annotations_from_images(
     )
 
     # Group by image name to handle multiple objects per image
-    grouped = df.groupby("image_name")
+    grouped = df.groupby("frame_idx")
 
-    for image_name, group in grouped:
-        image_path = os.path.join(image_dir, image_name)
+    for frame_idx, group in grouped:
+        image_path = os.path.join(image_dir, f"{frame_idx}.tif")
         if not os.path.exists(image_path):
-            print(f"Error: Image file {image_name} not found in {image_dir}.")
+            print(f"Error: Image file {frame_idx} not found in {image_dir}.")
             continue
 
         # Read the image
         image = cv2.imread(image_path)
         if image is None:
-            print(f"Error: Could not read the image {image_name}.")
+            print(f"Error: Could not read the image {frame_idx}.")
             continue
 
         # Save the original image and annotation
-        save_frame_and_annotation(image, group, annotations_dir, image_name, 0)
+        save_frame_and_annotation(image, group, annotations_dir, frame_idx, 0)
 
         # Apply augmentation if enabled and target size not reached
         if augment:
@@ -253,7 +253,7 @@ def create_yolo_annotations_from_images(
                     aug_image,
                     aug_group,
                     annotations_dir,
-                    image_name,
+                    frame_idx,
                     current_count,
                     augmented=True,
                 )
@@ -387,8 +387,8 @@ def create_yolo_pose_yaml(train_dir, val_dir, yaml_path):
     None: Saves the YAML configuration file.
     """
     data = {
-        "train": f"/cellpose/Drosophila_tracking/scripts/{train_dir}",
-        "val": f"/cellpose/Drosophila_tracking/scripts/{val_dir}",
+        "train": f"/cellpose/scripts/{train_dir}",
+        "val": f"/cellpose/scripts/{val_dir}",
         "nc": 1,  # Number of classes
         "names": ["pose"],  # Class names
         "kpt_shape": [3, 3],  # 3 keypoints, each with x, y, visibility

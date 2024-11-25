@@ -17,7 +17,7 @@ def main():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="./runs/pose/train20241115/weights/best.pt",
+        default="./runs/pose/train/weights/best.pt",
     )
     parser.add_argument("--max_id", type=int, default=10)
     parser.add_argument("--conf", type=float, default=0.01)
