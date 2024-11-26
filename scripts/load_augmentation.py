@@ -11,7 +11,7 @@ def main():
 
     csv_files = [
         "../annotations/annotation_241124double.csv",
-        "../annotations/annotation_241124white.csv"
+        "../annotations/annotation_241124white.csv",
         "../annotations/annotation_241115.csv",
     ]
 
@@ -22,8 +22,8 @@ def main():
     ]
 
     video_dirs = [
-        "../video/double_training1124_2fps.avi",
-        "../video/white_training1124_2fps.avi",
+        "../video/Training_1124double.avi",
+        "../video/Training_1124white.avi",
         "../video/white3rd_10fps-5min_test.avi",
     ]
 
@@ -46,7 +46,7 @@ def main():
             mask_dir,
             train_annotations_dir,
             augment=True,
-            target_size=2000,
+            target_size=3000,
         )
         create_yolo_annotations_with_mask(
             val_df, video_dir, mask_dir, val_annotations_dir, augment=False
