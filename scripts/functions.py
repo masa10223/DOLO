@@ -12,6 +12,20 @@ import matplotlib.pyplot as plt
 from ultralytics import YOLO
 from matplotlib.lines import Line2D  # 凡例作成のために追加
 from scipy.optimize import linear_sum_assignment  # 追加
+from scipy.optimize import minimize
+from tqdm import tqdm
+from natsort import natsorted
+from pykalman import  KalmanFilter
+from scipy.interpolate import UnivariateSpline
+from sklearn.ensemble import IsolationForest
+from scipy.spatial.distance import euclidean
+from collections import Counter
+
+import matplotlib
+# フォントの設定を Arial に変更
+matplotlib.rcParams['font.family'] = 'Arial'
+matplotlib.rcParams['font.sans-serif'] = ['Arial']
+matplotlib.rcParams['mathtext.it'] = 'Arial:italic'
 
 import csv
 
@@ -1459,3 +1473,450 @@ def correct_angles_per_id(data, threshold=45, accept_threshold=35):
     corrected_data = data.groupby("ID", group_keys=False).apply(correct_angles)
 
     return corrected_data
+
+
+
+#### Interpolation Part
+
+def create_kalman_filter(x, y):
+    """
+    カルマンフィルタを初期化します。
+    """
+    kf = KalmanFilter(initial_state_mean=[x, y, 0, 0],
+                      transition_matrices=[[1, 0, 1, 0],
+                                           [0, 1, 0, 1],
+                                           [0, 0, 1, 0],
+                                           [0, 0, 0, 1]],
+                      observation_matrices=[[1, 0, 0, 0],
+                                            [0, 1, 0, 0]],
+                      transition_covariance=0.01 * np.eye(4),
+                      observation_covariance=10.0 * np.eye(2),
+                      initial_state_covariance=100.0 * np.eye(4))
+    return kf
+
+def calculate_angle_between_vectors(T, m, H):
+    """
+    Calculates the angle θ between the vectors Tm_g and m_gH using vector math.
+
+    Parameters:
+    T (np.array): Coordinates of the Tail (T) [x, y].
+    m (np.array): Coordinates of the Mid (m) [x, y].
+    H (np.array): Coordinates of the Head (H) [x, y].
+
+    Returns:
+    float: Angle θ in degrees.
+    """
+    # Calculate vectors Tm_g and m_gH
+    T_mg = m - T  # Vector from Tail to Mid: Tm_g = m - T
+    mg_H = H - m  # Vector from Mid to Head: m_gH = H - m
+
+    # Calculate the dot product of the vectors
+    dot_product = np.dot(T_mg, mg_H)
+
+    # Calculate magnitudes (norms) of the vectors
+    magnitude_T_mg = np.linalg.norm(T_mg)
+    magnitude_mg_H = np.linalg.norm(mg_H)
+
+    # Check for zero magnitude to avoid division by zero
+    if magnitude_T_mg == 0 or magnitude_mg_H == 0:
+        return np.nan
+
+    # Calculate the cosine of the angle using the dot product formula
+    cos_theta = dot_product / (magnitude_T_mg * magnitude_mg_H)
+
+    # Clip cos_theta to avoid potential numerical issues outside [-1, 1]
+    cos_theta = np.clip(cos_theta, -1.0, 1.0)
+
+    # Calculate the angle in radians and then convert to degrees
+    theta = np.arccos(cos_theta)  # Radians
+    theta_degrees = np.degrees(theta)  # Convert to degrees
+
+    return theta_degrees
+
+
+
+def smooth_trajectory_with_flip_correction(data):
+    """
+    ラルバのトラッキングデータに対してカルマンフィルタとスプライン補間を適用し、
+    Head, Middle, Tail の座標を平滑化し、進行方向に基づいて Head と Tail を修正します。
+    最後に Smoothed_Angle を計算します。
+
+    Parameters:
+        data (pd.DataFrame): トラッキングデータ。必要な列:
+            ['ID', 'Frame', 'Middle_X', 'Middle_Y', 'Head_X', 'Head_Y', 'Tail_X', 'Tail_Y']
+
+    Returns:
+        pd.DataFrame: 平滑化されたデータ、修正後の Head/Tail、および 'Smoothed_Angle' を含むデータフレーム。
+    """
+    data = data.copy()
+    ids = data['ID'].unique()
+    smoothed_data = []
+
+    for id_value in tqdm(ids, desc="Smoothing Trajectories"):
+        id_data = data[data['ID'] == id_value].sort_values(by='Frame')
+        frames = id_data['Frame'].values
+
+        # 対象の列
+        columns_to_smooth = ['Middle_X', 'Middle_Y', 'Head_X', 'Head_Y', 'Tail_X', 'Tail_Y']
+
+        for col in columns_to_smooth:
+            # 欠損値を線形補間で埋める
+            id_data[col] = id_data[col].interpolate(method='linear', limit_direction='both')
+
+        # 各ペア（X, Y）ごとに平滑化を適用
+        smoothed_results = {}
+        for pair in [('Middle_X', 'Middle_Y'), ('Head_X', 'Head_Y'), ('Tail_X', 'Tail_Y')]:
+            x_col, y_col = pair
+            observations = id_data[[x_col, y_col]].values
+
+            # 観測データの形状を確認
+            if observations.ndim != 2 or observations.shape[1] != 2:
+                print(f"ID {id_value} の観測データ {pair} の形状が不正です。スキップします。")
+                continue
+
+            kf = create_kalman_filter(observations[0, 0], observations[0, 1])
+            state_means, _ = kf.smooth(observations)
+
+            # データポイント数を確認
+            m = len(frames)
+            # スプラインの次数を設定（デフォルトは3）
+            k = 3
+            if m <= k:
+                # データポイント数が少ない場合は次数を調整
+                k = m - 1 if m > 1 else 0  # k は0以上
+                if k >= 1:
+                    # スプライン補間を次数 k で実行
+                    smoothed_x = UnivariateSpline(frames, state_means[:, 0], k=k, s=0)(frames)
+                    smoothed_y = UnivariateSpline(frames, state_means[:, 1], k=k, s=0)(frames)
+                else:
+                    # データポイントが1つまたは0の場合、そのまま使用
+                    smoothed_x = state_means[:, 0]
+                    smoothed_y = state_means[:, 1]
+            else:
+                # データポイント数が十分な場合は通常通りスプライン補間
+                smoothed_x = UnivariateSpline(frames, state_means[:, 0], s=2)(frames)
+                smoothed_y = UnivariateSpline(frames, state_means[:, 1], s=2)(frames)
+
+            # 平滑化結果を格納
+            smoothed_results[x_col] = smoothed_x
+            smoothed_results[y_col] = smoothed_y
+
+        # 平滑化結果を id_data に追加
+        for col in smoothed_results:
+            id_data[f'Smoothed_{col}'] = smoothed_results[col]
+
+        # 速度計算のためのシフト列を追加
+        id_data['Prev_Smoothed_Middle_X'] = id_data['Smoothed_Middle_X'].shift(1)
+        id_data['Prev_Smoothed_Middle_Y'] = id_data['Smoothed_Middle_Y'].shift(1)
+
+        # 速度方向に基づいて Head と Tail を修正
+        def correct_flip(row):
+            # 平滑化された座標を取得
+            head = np.array([row['Smoothed_Head_X'], row['Smoothed_Head_Y']])
+            tail = np.array([row['Smoothed_Tail_X'], row['Smoothed_Tail_Y']])
+            middle = np.array([row['Smoothed_Middle_X'], row['Smoothed_Middle_Y']])
+            prev_middle = np.array([row['Prev_Smoothed_Middle_X'], row['Prev_Smoothed_Middle_Y']])
+            
+            velocity = middle - prev_middle
+            velocity_dir = velocity / (np.linalg.norm(velocity) + 1e-10)  # 小さい値を足してゼロ除算を防止
+            head_dir = (head - middle) / (np.linalg.norm(head - middle) + 1e-10)
+            head_dir = (head - middle) / np.linalg.norm(head - middle)
+
+            # ベクトルの内積で方向を確認
+            if np.dot(velocity_dir, head_dir) < 0:  # 方向が逆の場合
+                return pd.Series({
+                    'Smoothed_Head_X': row['Smoothed_Tail_X'],
+                    'Smoothed_Head_Y': row['Smoothed_Tail_Y'],
+                    'Smoothed_Tail_X': row['Smoothed_Head_X'],
+                    'Smoothed_Tail_Y': row['Smoothed_Head_Y'],
+                })
+            else:
+                return pd.Series({
+                    'Smoothed_Head_X': row['Smoothed_Head_X'],
+                    'Smoothed_Head_Y': row['Smoothed_Head_Y'],
+                    'Smoothed_Tail_X': row['Smoothed_Tail_X'],
+                    'Smoothed_Tail_Y': row['Smoothed_Tail_Y'],
+                })
+
+        # Flip の修正結果を id_data に反映
+        flip_corrected = id_data.apply(correct_flip, axis=1)
+        id_data.update(flip_corrected)
+
+        # Smoothed_Angle を計算
+        def compute_angle(row):
+            T = np.array([row['Smoothed_Tail_X'], row['Smoothed_Tail_Y']])
+            m = np.array([row['Smoothed_Middle_X'], row['Smoothed_Middle_Y']])
+            H = np.array([row['Smoothed_Head_X'], row['Smoothed_Head_Y']])
+            return calculate_angle_between_vectors(T, m, H)
+
+        id_data['Smoothed_Angle'] = id_data.apply(compute_angle, axis=1)
+
+        ## Velocity を計算
+        id_data['Speed'] = np.nan  # Speed カラムを初期化
+    
+        # 個体（ID）ごとに処理
+        for id_value, group in id_data.groupby('ID'):
+            group = group.sort_values(by='Frame')  # フレーム順にソート
+            dx = group['Smoothed_Middle_X'].diff()  # X座標の変化量
+            dy = group['Smoothed_Middle_Y'].diff()  # Y座標の変化量
+            distance = np.sqrt(dx**2 + dy**2)  # 移動距離
+            frame_diff = group['Frame'].diff()  # フレーム間隔
+            speed = distance / frame_diff  # 距離をフレーム間隔で割る
+            id_data.loc[group.index, 'Speed'] = speed  # 結果を元のデータに追加
+
+        smoothed_data.append(id_data)
+
+    return pd.concat(smoothed_data).reset_index(drop=True)
+
+
+def detect_contact_flags(data, radius = 15):
+    """
+    各フレームで接触フラグを判定する。
+
+    Parameters:
+        data (pd.DataFrame): 入力データ。
+        radius (float): 接触を判定する距離のしきい値。
+
+    Returns:
+        pd.Series: 接触フラグ（True/False）。
+    """
+    contact_flags = pd.Series(False, index=data.index)  # 初期化（全て False）
+    frames = data['Frame'].unique()
+
+    for frame in tqdm(frames, desc = 'Checking contacts...'):
+        frame_data = data[data['Frame'] == frame]
+
+        for i, row1 in frame_data.iterrows():
+            id1 = row1['ID']
+            head_pos1 = np.array([row1['Smoothed_Middle_X'], row1['Smoothed_Middle_Y']])
+
+            for j, row2 in frame_data.iterrows():
+                if id1 == row2['ID']:
+                    continue
+                body_positions = [
+                    np.array([row2['Smoothed_Head_X'], row2['Smoothed_Head_Y']]),
+                    np.array([row2['Smoothed_Middle_X'], row2['Smoothed_Middle_Y']]),
+                    np.array([row2['Smoothed_Tail_X'], row2['Smoothed_Tail_Y']])
+                ]
+                distances = [np.linalg.norm(head_pos1 - pos) for pos in body_positions]
+                if min(distances) <= radius:
+                    contact_flags[i] = True
+                    break
+
+    return contact_flags
+
+
+def judge_state(data, 
+                contact_radius = 15,
+                angle_threshold = 35,
+                speed_threshold = 0.3,
+                frame_interval = 1):
+    """
+    行動を分類します。
+    
+    Parameters:
+        data (pd.DataFrame): トラッキングデータ。
+        contact_radius (float): 接触の判定に使用する距離閾値。
+        angle_threshold (float): ターンと判断する角度閾値。
+        speed_threshold (float): 移動と判断する速度閾値。
+        frame_interval (int): フレームを区切る間隔。1 にするとフレームごとの処理。
+        
+    Returns:
+        pd.DataFrame: 各フレームの行動ラベルを含むデータフレーム。
+    """
+    data = data.copy()
+    # ステップ1: 平滑化と Head/Tail 修正
+    data_smoothed = smooth_trajectory_with_flip_correction(data)
+    # ステップ2: Contact フラグを計算
+    data_smoothed['Contact'] = detect_contact_flags(data_smoothed, contact_radius)
+    # ステップ3: 結果を格納するリスト
+    behaviors = []
+
+    # 個体ごとに処理
+    ids = data_smoothed['ID'].unique()
+    for id_value in tqdm(ids, desc='Classifying Behaviors'):
+        individual_data = data_smoothed[data_smoothed['ID'] == id_value].sort_values(by='Frame')
+        frames = individual_data['Frame'].values
+        angles = individual_data['Smoothed_Angle'].values
+        speeds = individual_data['Speed'].values
+        contacts = individual_data['Contact'].values
+
+        # フレームを frame_interval ごとに間引いて処理
+        for i in range(0, len(frames), frame_interval):
+            if i >= len(frames):
+                break  # 範囲外の場合はスキップ
+
+            # 1フレームごとの処理
+            avg_angle = angles[i]
+            avg_speed = speeds[i]
+            contact_flag = contacts[i]
+
+            # 行動を分類
+            if avg_angle >= angle_threshold:
+                behavior = 'Turn'
+            elif avg_speed >= speed_threshold:
+                behavior = 'Crawl'
+            else:
+                behavior = 'Pause'
+
+            # 各フレームにラベルを付ける
+            behaviors.append({
+                'ID': id_value, 
+                'Frame': frames[i], 
+                'contact_flag': int(contact_flag), 
+                'state': behavior
+            })
+            
+    # ステップ4: 結果をデータフレームにまとめる
+    behavior_df = pd.DataFrame(behaviors)
+
+    return behavior_df
+
+
+## Reinforcement Part
+
+def compute_transition_matrices(data, states):
+    """
+    非接触 (c=0) と接触 (c=1) の遷移確率行列を計算
+    """
+    transition_counts_c0 = Counter()
+    transition_counts_c1_c0 = Counter()
+    transition_counts_c1_c1 = Counter()
+    state_counts_c0 = Counter()
+    state_counts_c1 = Counter()
+    
+    for idx in range(len(data) - 1):
+        s_prev = data.iloc[idx]["state_num"]
+        s_next = data.iloc[idx + 1]["state_num"]
+        c_prev = data.iloc[idx]["contact_flag"]
+        c_next = data.iloc[idx + 1]["contact_flag"]
+        
+        if c_prev == 0:  # 非接触時
+            transition_counts_c0[(s_prev, s_next)] += 1
+            state_counts_c0[s_prev] += 1
+        elif c_prev == 1:  # 接触時
+            if c_next == 0:
+                transition_counts_c1_c0[(s_prev, s_next)] += 1
+            elif c_next == 1:
+                transition_counts_c1_c1[(s_prev, s_next)] += 1
+            state_counts_c1[s_prev] += 1
+    
+    # 行列を構築
+    P_c0 = np.zeros((len(states), len(states)))
+    P_c1_c0 = np.zeros((len(states), len(states)))
+    P_c1_c1 = np.zeros((len(states), len(states)))
+    
+    for (s, s_next), count in transition_counts_c0.items():
+        P_c0[s, s_next] = count / state_counts_c0[s]
+    
+    for (s, s_next), count in transition_counts_c1_c0.items():
+        P_c1_c0[s, s_next] = count / state_counts_c1[s]
+    
+    for (s, s_next), count in transition_counts_c1_c1.items():
+        P_c1_c1[s, s_next] = count / state_counts_c1[s]
+    
+    return P_c0, P_c1_c0, P_c1_c1
+
+
+def negative_log_likelihood(v, P_c0, P_c1_c0, P_c1_c1, data, states):
+    """
+    負の対数尤度関数
+    """
+    v = np.array(v)
+    z = np.exp(-v)  # desirability function
+    log_likelihood = 0
+    
+    for idx in range(len(data) - 1):
+        s_prev = data.iloc[idx]["state_num"]
+        s_next = data.iloc[idx + 1]["state_num"]
+        c_prev = data.iloc[idx]["contact_flag"]
+        
+        if c_prev == 0:  # 非接触時
+            P_current = P_c0[s_prev, :]
+        elif c_prev == 1:  # 接触時
+            # 接触時の遷移確率
+            P_contact = P_c1_c0[s_prev, :] + P_c1_c1[s_prev, :]
+            P_current = P_contact * z
+            sum_P_current = np.sum(P_current)
+            if sum_P_current > 0:
+                P_current /= sum_P_current
+            else:
+                P_current[:] = 1 / len(states)  # 一様分布に置き換え
+
+        # 対数尤度を計算
+        if P_current[s_next] > 0:
+            log_likelihood += np.log(P_current[s_next])
+        else:
+            log_likelihood += np.log(1e-10)  # 極小値で代用
+    
+    return -log_likelihood  # 負の対数尤度
+
+
+def calculate_value_funcs(path):
+    flatten = lambda x: [z for y in x for z in (flatten(y) if hasattr(y, '__iter__') and not isinstance(y, str) else (y,))]
+
+    df = pd.read_csv(path)
+    behavior_df = judge_state(df,
+                         frame_interval=5)
+    behavior_df['contact_and_state'] = behavior_df['contact_flag'].astype(str) + '_' + behavior_df['state']
+    
+    contact_and_state_mapping = {
+        '0_Crawl': 0,
+        '0_Turn': 1,
+        '0_Pause': 2,
+        '1_Crawl': 3,
+        '1_Turn': 4,
+        '1_Pause': 5
+    }
+    
+    state_mapping = {
+        'Crawl': 0,
+        'Turn': 1,
+        'Pause': 2,
+    }
+    
+    behavior_df['contact_and_state_num'] = behavior_df['contact_and_state'].map(contact_and_state_mapping)
+    behavior_df['state_num'] = behavior_df['state'].map(state_mapping)
+    # state全部
+    states = sorted(behavior_df["state_num"].unique())
+    results = []
+    plt.figure(figsize=(35, 35))
+    for id_ in sorted(behavior_df['ID'].unique()):
+        # IDによる選別
+        data = behavior_df[behavior_df.ID == id_]
+        
+        # 確率遷移行列を計算
+        P_c0, P_c1_c0, P_c1_c1 = compute_transition_matrices(data, states)
+        # passive data
+        # 非接触 (c=0) データのフィルタリング
+        passive_data = data[data["contact_flag"] == 0]
+        # 初期値 (v を 0 に初期化)
+        v_init = np.zeros(len(states))  # 基本状態の価値関数は3つ
+        # 最適化
+        result_passive = minimize(
+            negative_log_likelihood,
+            v_init,
+            args=(P_c0, P_c1_c0, P_c1_c1, passive_data, states),
+            method="BFGS"
+        )
+        # 推定された価値関数
+        v_passive_estimated = result_passive.x
+        # contact data
+        contact_data = data[data["contact_flag"] == 1]
+        
+        # 初期値 (v を 0 に初期化)
+        v_init = np.zeros(len(states))  # 基本状態の価値関数は3つ
+        # 最適化
+        result_contact = minimize(
+            negative_log_likelihood,
+            v_init,
+            args=(P_c0, P_c1_c0, P_c1_c1, contact_data, states),
+            method="BFGS"
+        )
+        
+        # 推定された価値関数
+        v_contact_estimated = result_contact.x
+        filename = os.path.basename(path)
+        results.append(flatten([filename, id_, v_passive_estimated.tolist(), v_contact_estimated.tolist()]))
+
+    return results, pd.DataFrame(results)
