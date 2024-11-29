@@ -1,14 +1,14 @@
 from ultralytics import YOLO
 
-#from ultralytics import settings
+from ultralytics import settings
 ## https://docs.ultralytics.com/ja/quickstart/#modifying-settings
 ## You may change the path
-#settings.update({"datasets_dir": "/cellpose/DOLO/scripts"})
+settings.update({"datasets_dir": "/cellpose/scripts"})
 
 #model = YOLO("./yolo11x-pose.pt")
-model = YOLO("./runs/pose/train20241126/weights/best.pt")
+model = YOLO("./runs/pose/train20241115/weights/best.pt")
 
-results = model.train(data='./yolo_pose_config_1126.yaml', 
+results = model.train(data='./yolo_pose_config_1129.yaml', 
                       epochs=15, batch=20,
                       device=[2, 3]) # 先ほど作成したデータセット内のyamlファイルまでのパスを指定
 # Export the model

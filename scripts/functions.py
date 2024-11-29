@@ -657,7 +657,7 @@ def annotate_frame_with_keypoints(
 
     # Add frame number in red color
     ax.text(
-        10, 90, f"Frame: {frame_number}", color="red", fontsize=16, fontweight="bold"
+        100, 10, f"Frame: {frame_number}", color="red", fontsize=25, fontweight="bold"
     )
 
     # Remove margins
@@ -872,7 +872,7 @@ def process_video_to_gif_with_angles(
     consistentid_to_velocity = {}
     # 一貫した色割り当ての初期化
     id_to_color = {}
-    color_palette = plt.get_cmap("tab20", max_consistent_id)
+    color_palette = plt.get_cmap("tab20", 10)
     for consistent_id in range(1, max_consistent_id + 1):
         color_index = (consistent_id - 1) % color_palette.N
         color = color_palette(color_index)[:3]
@@ -1852,12 +1852,15 @@ def negative_log_likelihood(v, P_c0, P_c1_c0, P_c1_c1, data, states):
     return -log_likelihood  # 負の対数尤度
 
 
-def calculate_value_funcs(path):
+def calculate_value_funcs(path, contact_radius = 15, angle_threshold = 35, speed_threshold = 0.3, frame_interval = 5):
     flatten = lambda x: [z for y in x for z in (flatten(y) if hasattr(y, '__iter__') and not isinstance(y, str) else (y,))]
 
     df = pd.read_csv(path)
     behavior_df = judge_state(df,
-                         frame_interval=5)
+                        contact_radius = contact_radius,
+                        angle_threshold = angle_threshold,
+                        speed_threshold = speed_threshold,
+                        frame_interval = frame_interval)
     behavior_df['contact_and_state'] = behavior_df['contact_flag'].astype(str) + '_' + behavior_df['state']
     
     contact_and_state_mapping = {

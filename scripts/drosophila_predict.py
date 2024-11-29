@@ -28,7 +28,7 @@ def main():
     output_csv_path = arguments.output_csv_path
     max_consistent_id = arguments.max_id
     confidence = arguments.conf
-    model_path = "./runs/pose/train20241126/weights/best.pt"
+    model_path = "./runs/pose/train20241129/weights/best.pt"
 
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
     start = time.time()
