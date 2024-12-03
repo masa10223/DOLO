@@ -17,10 +17,11 @@ def main():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="./runs/pose/train20241127/weights/best.pt",
+        default="./runs/pose/train20241129/weights/best.pt",
     )
     parser.add_argument("--max_id", type=int, default=10)
     parser.add_argument("--conf", type=float, default=1e-4)
+    parser.add_argument("--max_missing_frames", type=int, default=30)
     arguments = parser.parse_args()
 
     video_path = arguments.video_path
@@ -28,6 +29,7 @@ def main():
     output_csv_path = arguments.output_csv_path
     max_consistent_id = arguments.max_id
     confidence = arguments.conf
+    max_missing_frames = arguments.max_missing_frames
     model_path = "./runs/pose/train20241129/weights/best.pt"
 
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
@@ -41,10 +43,11 @@ def main():
     process_video_to_gif_with_angles(
         video_path=video_path,
         output_gif_path=output_gif_path,
-        model_path = model_path,
+        model_path=model_path,
         confidence=confidence,
-        max_consistent_id=max_consistent_id,
+        max_consistent_ids=max_consistent_id,
         output_csv_path=output_csv_path,
+        max_missing_frames=max_missing_frames,
     )
 
     # process_video_to_gif_with_angles_and_tracking(

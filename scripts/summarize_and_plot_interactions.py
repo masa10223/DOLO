@@ -527,6 +527,7 @@ def plot_contact_count_heatmap(contact_events_df):
 def select_frames(thr_frame = 5000): 
     control_matrix_files = []
     for path in natsorted(glob.glob('./csvs/trajectory/C*')):
+        print(f"Selecting frames from {path}")
         tmp_df = pd.read_csv(path)
         total_frames = tmp_df['Frame'].max() + 1
         if total_frames > thr_frame:
@@ -535,6 +536,7 @@ def select_frames(thr_frame = 5000):
 
     mutant_matrix_files = []
     for path in natsorted(glob.glob('./csvs/trajectory/D*')):
+        print(f"Selecting frames from {path}")
         tmp_df = pd.read_csv(path)
         total_frames = tmp_df['Frame'].max() + 1
         if total_frames > thr_frame:
@@ -542,7 +544,6 @@ def select_frames(thr_frame = 5000):
             mutant_matrix_files.append(path)
             
     return control_matrix_files, mutant_matrix_files
-
 
 def summarize_initeractions_controls(control_matrix_files, head_radius=15, max_gap=5, max_displacement=20):
     for control_path in tqdm(

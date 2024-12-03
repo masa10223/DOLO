@@ -4,10 +4,10 @@ from sklearn.model_selection import train_test_split
 
 
 def main():
-    train_annotations_dir = "train_annotations_1126"
+    train_annotations_dir = "train_annotations_1204"
     # Path to save validation YOLO annotations and images
-    val_annotations_dir = "val_annotations_1126"
-    yaml_path = "./yolo_pose_config_1126.yaml"
+    val_annotations_dir = "val_annotations_1204"
+    yaml_path = "./yolo_pose_config_1204.yaml"
 
     csv_files = [
         "../annotations/annotation_241124double.csv",
@@ -34,7 +34,7 @@ def main():
         grouped = [group for _, group in df.groupby("frame_idx")]
         # Split the groups into train and test sets
         train_groups, val_groups = train_test_split(
-            grouped, test_size=0.25, random_state=42
+            grouped, test_size=0.10, random_state=42
         )
         # Concatenate groups back into DataFrames
         train_df = pd.concat(train_groups).reset_index(drop=True)
@@ -46,7 +46,7 @@ def main():
             mask_dir,
             train_annotations_dir,
             augment=True,
-            target_size=3000,
+            target_size=1000,
         )
         create_yolo_annotations_with_mask(
             val_df, video_dir, mask_dir, val_annotations_dir, augment=False

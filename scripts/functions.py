@@ -1,3 +1,4 @@
+import csv
 import cv2
 import pandas as pd
 import os
@@ -15,19 +16,18 @@ from scipy.optimize import linear_sum_assignment  # 追加
 from scipy.optimize import minimize
 from tqdm import tqdm
 from natsort import natsorted
-from pykalman import  KalmanFilter
+from pykalman import KalmanFilter
 from scipy.interpolate import UnivariateSpline
 from sklearn.ensemble import IsolationForest
 from scipy.spatial.distance import euclidean
 from collections import Counter
 
 import matplotlib
-# フォントの設定を Arial に変更
-matplotlib.rcParams['font.family'] = 'Arial'
-matplotlib.rcParams['font.sans-serif'] = ['Arial']
-matplotlib.rcParams['mathtext.it'] = 'Arial:italic'
 
-import csv
+# フォントの設定を Arial に変更
+matplotlib.rcParams["font.family"] = "Arial"
+matplotlib.rcParams["font.sans-serif"] = ["Arial"]
+matplotlib.rcParams["mathtext.it"] = "Arial:italic"
 
 
 ############################
@@ -93,7 +93,8 @@ def create_yolo_annotations_with_mask(
         # マスク画像の読み込み
         mask_path = os.path.join(mask_dir, f"{frame_idx}.tif")
         if not os.path.exists(mask_path):
-            print(f"Warning: Mask image for frame {frame_idx} not found. Skipping.")
+            print(
+                f"Warning: Mask image for frame {frame_idx} not found. Skipping.")
             continue
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
@@ -105,13 +106,15 @@ def create_yolo_annotations_with_mask(
         masked_frame = cv2.bitwise_and(frame, frame, mask=mask)
 
         # フレームとアノテーションを保存
-        save_frame_and_annotation(masked_frame, group, annotations_dir, frame_idx, 0)
+        save_frame_and_annotation(
+            masked_frame, group, annotations_dir, frame_idx, 0)
 
         # データ拡張が有効な場合、ターゲットサイズまで拡張
         if augment:
             current_count = len(group)
             while current_count < target_size:
-                aug_frame, aug_group = apply_augmentation(masked_frame, group, aug_seq)
+                aug_frame, aug_group = apply_augmentation(
+                    masked_frame, group, aug_seq)
                 save_frame_and_annotation(
                     aug_frame,
                     aug_group,
@@ -156,12 +159,20 @@ def create_yolo_annotations(
         iaa.Sequential(
             [
                 iaa.Fliplr(0.5),  # Horizontal flip 50% of the time
-                iaa.Affine(
-                    rotate=(-25, 25)
-                ),  # Random rotation between -25 and 25 degrees
-                iaa.Affine(translate_px={"x": (-30, 30), "y": (-20, 20)}),
-                iaa.ScaleX((0.95, 1.05)),  # Random scaling along X-axis
-                iaa.ScaleY((0.95, 1.05)),  # Random scaling along Y-axis
+                iaa.ShiftScaleRotate(shift_limit=(-0.0625, 0.0625),
+                                     scale_limit=(-0.1, 0.1),
+                                     rotate_limit=(-25, 25),
+                                     p=0.1),  # Add random affine transformation ## default
+                iaa.SafeRotate(limit=(-25,25),
+                               p = 0.1), # Rotate the input inside the input's frame by an angle selected randomly from the uniform distribution.
+                iaa.GaussNoize(p=0.1),  # Add gaussian noise
+                # Apply poisson noise to an image to simulate camera sensor noise.
+                iaa.ISONoise(),
+                iaa.MultiplicativeNoise(multiplier=(0.9, 1.1),
+                                        p=0.1),  # Multiply image and random array
+                iaa.RandomBrightnessContrast(brightness_limit=(-0.2, 0.2),
+                                             contrast_limit=(-0.2, 0.2),
+                                             p=0.1),  # Randomly changes the brightness and contrast of the input image.
             ]
         )
         if augment
@@ -188,7 +199,8 @@ def create_yolo_annotations(
         if augment:
             current_count = len(group)
             while current_count < target_size:
-                aug_frame, aug_group = apply_augmentation(frame, group, aug_seq)
+                aug_frame, aug_group = apply_augmentation(
+                    frame, group, aug_seq)
                 save_frame_and_annotation(
                     aug_frame,
                     aug_group,
@@ -262,7 +274,8 @@ def create_yolo_annotations_from_images(
         if augment:
             current_count = len(group)
             while current_count < target_size:
-                aug_image, aug_group = apply_augmentation(image, group, aug_seq)
+                aug_image, aug_group = apply_augmentation(
+                    image, group, aug_seq)
                 save_frame_and_annotation(
                     aug_image,
                     aug_group,
@@ -511,7 +524,7 @@ def plot_coordinates_on_frame(video_path, csv_path, track_ids=None, frame_idx=No
 
 
 #######
-#### Animationm Part
+# Animationm Part
 ######
 
 
@@ -603,7 +616,7 @@ def annotate_frame_with_keypoints(
             middle[1] + 10,
             f"ID:{consistent_id},\n θ={theta:.1f}°",
             color=color,
-            fontsize=12,
+            fontsize=16,
         )
 
     # Remove axis
@@ -638,7 +651,8 @@ def annotate_frame_with_keypoints(
             markerfacecolor="gray",
             markersize=10,
         ),
-        Line2D([0], [0], marker="x", color="gray", label="Middle", markersize=10),
+        Line2D([0], [0], marker="x", color="gray",
+               label="Middle", markersize=10),
         Line2D(
             [0],
             [0],
@@ -651,13 +665,14 @@ def annotate_frame_with_keypoints(
     ]
 
     # Combine legends
-    first_legend = ax.legend(handles=legend_elements, loc="upper right", title="IDs")
+    first_legend = ax.legend(handles=legend_elements,
+                             loc="upper right", title="IDs")
     ax.add_artist(first_legend)
     ax.legend(handles=marker_elements, loc="upper left", title="Keypoints")
 
     # Add frame number in red color
     ax.text(
-        100, 10, f"Frame: {frame_number}", color="red", fontsize=25, fontweight="bold"
+        100, 900, f"Frame: {frame_number}", color="red", fontsize=25, fontweight="bold"
     )
 
     # Remove margins
@@ -760,12 +775,13 @@ def ensure_head_in_direction_of_accumulated_movement(
 
     # Keep only the last 2N positions
     if len(positions_history[consistent_id]) > 2 * N:
-        positions_history[consistent_id] = positions_history[consistent_id][-2 * N :]
+        positions_history[consistent_id] = positions_history[consistent_id][-2 * N:]
 
     # Calculate movement vector
     if len(positions_history[consistent_id]) >= N:
         movement_vector = (
-            positions_history[consistent_id][-1] - positions_history[consistent_id][-N]
+            positions_history[consistent_id][-1] -
+            positions_history[consistent_id][-N]
         )
         movement_distance = np.linalg.norm(movement_vector)
 
@@ -776,9 +792,11 @@ def ensure_head_in_direction_of_accumulated_movement(
             if not orientation_fixed[consistent_id]:
                 # Vectors from middle to head and tail
                 head_vector = head - middle
-                head_vector = head_vector / (np.linalg.norm(head_vector) + 1e-6)
+                head_vector = head_vector / \
+                    (np.linalg.norm(head_vector) + 1e-6)
                 tail_vector = tail - middle
-                tail_vector = tail_vector / (np.linalg.norm(tail_vector) + 1e-6)
+                tail_vector = tail_vector / \
+                    (np.linalg.norm(tail_vector) + 1e-6)
 
                 # Compare dot products
                 head_similarity = np.dot(movement_vector, head_vector)
@@ -786,9 +804,11 @@ def ensure_head_in_direction_of_accumulated_movement(
 
                 # Decide correct orientation
                 if head_similarity >= tail_similarity:
-                    head_tail_mapping[consistent_id] = {"head": "head", "tail": "tail"}
+                    head_tail_mapping[consistent_id] = {
+                        "head": "head", "tail": "tail"}
                 else:
-                    head_tail_mapping[consistent_id] = {"head": "tail", "tail": "head"}
+                    head_tail_mapping[consistent_id] = {
+                        "head": "tail", "tail": "head"}
                     head, tail = tail, head  # Swap head and tail
 
                 orientation_fixed[consistent_id] = True
@@ -807,25 +827,30 @@ def ensure_head_in_direction_of_accumulated_movement(
                     # 角度の変化を計算
                     angle_change = np.arccos(
                         np.clip(
-                            np.dot(movement_vector, previous_movement_vector), -1.0, 1.0
+                            np.dot(movement_vector,
+                                   previous_movement_vector), -1.0, 1.0
                         )
                     )
                     angle_change_degrees = np.degrees(angle_change)
 
                     if angle_change_degrees > angle_threshold:
-                        orientation_fixed[consistent_id] = False  # Reset orientation
+                        # Reset orientation
+                        orientation_fixed[consistent_id] = False
 
         else:
             # Movement is too small, use angle-based method
-            head, middle, tail = determine_head_tail_based_on_angle(head, middle, tail)
+            head, middle, tail = determine_head_tail_based_on_angle(
+                head, middle, tail)
             orientation_fixed[consistent_id] = (
                 True  # Assume orientation is fixed for now
             )
 
     else:
         # Not enough data, use angle-based method
-        head, middle, tail = determine_head_tail_based_on_angle(head, middle, tail)
-        orientation_fixed[consistent_id] = True  # Assume orientation is fixed for now
+        head, middle, tail = determine_head_tail_based_on_angle(
+            head, middle, tail)
+        # Assume orientation is fixed for now
+        orientation_fixed[consistent_id] = True
 
     # Use fixed orientation if available
     if orientation_fixed[consistent_id] and consistent_id in head_tail_mapping:
@@ -840,31 +865,31 @@ def process_video_to_gif_with_angles(
     output_gif_path,
     model_path="./runs/pose/train/weights/best.pt",
     frame_skip=1,
-    distance_threshold=30,
-    max_consistent_id=15,
     output_csv_path="./output_positions_angles.csv",
     confidence=0.01,
+    distance_threshold=50,
+    max_missing_frames=30,
+    max_consistent_ids=15,
 ):
     """
-    動画を処理し、各フレームに対して推論を行い、角度を計算し、
-    キーポイントと角度でフレームに注釈を付け、結果をループするGIFに変換します。
-    さらに、各IDの位置と角度のデータをCSVファイルに保存します。
+    動画を処理し、キーポイントと角度を注釈として付与したGIFを生成する。
+    キーポイントの位置と角度のデータをCSVにも保存する。
     """
-    # YOLOモデルをロード
+    from imageio import get_writer
+
     try:
         model = YOLO(model_path)
     except Exception as e:
         print(f"YOLOモデルの読み込みエラー: {e}")
         return
 
-    # ビデオファイルを開く
     try:
         cap = cv2.VideoCapture(video_path)
     except Exception as e:
         print(f"ビデオファイルのオープンエラー: {e}")
         return
-    frame_count = 0
 
+    frame_count = 0
     # マッピングとデータ構造の初期化
     consistentid_to_last_keypoints = {}
     consistentid_to_last_position = {}
@@ -873,7 +898,7 @@ def process_video_to_gif_with_angles(
     # 一貫した色割り当ての初期化
     id_to_color = {}
     color_palette = plt.get_cmap("tab20", 10)
-    for consistent_id in range(1, max_consistent_id + 1):
+    for consistent_id in range(1, max_consistent_ids + 1):
         color_index = (consistent_id - 1) % color_palette.N
         color = color_palette(color_index)[:3]
         id_to_color[consistent_id] = color
@@ -885,12 +910,13 @@ def process_video_to_gif_with_angles(
 
     max_missing_frames = 50
     consistentid_to_last_seen = {}
-    available_consistent_ids = set(range(1, max_consistent_id + 1))
+    available_consistent_ids = set(range(1, max_consistent_ids + 1))
     active_consistent_ids = set()
 
     # GIFとCSVの準備
     try:
-        gif_writer = imageio.get_writer(output_gif_path, mode="I", fps=10, loop=0)
+        gif_writer = imageio.get_writer(
+            output_gif_path, mode="I", fps=10, loop=0)
     except Exception as e:
         print(f"GIFライターの初期化中にエラーが発生しました: {e}")
         cap.release()
@@ -975,11 +1001,13 @@ def process_video_to_gif_with_angles(
                             # 変数を初期化
                             assigned_indices = set()
                             assigned_cids = set()
-                            cid_list = list(consistentid_to_last_position.keys())
+                            cid_list = list(
+                                consistentid_to_last_position.keys())
 
                             if predicted_positions:
                                 cost_matrix = np.zeros(
-                                    (len(predicted_positions), len(current_positions))
+                                    (len(predicted_positions),
+                                     len(current_positions))
                                 )
 
                                 for i, predicted_position in enumerate(
@@ -993,7 +1021,8 @@ def process_video_to_gif_with_angles(
                                         )
                                         cost_matrix[i, j] = distance
 
-                                row_ind, col_ind = linear_sum_assignment(cost_matrix)
+                                row_ind, col_ind = linear_sum_assignment(
+                                    cost_matrix)
 
                                 # 既存のIDを一致させる処理
                                 for i, j in zip(row_ind, col_ind):
@@ -1005,7 +1034,8 @@ def process_video_to_gif_with_angles(
                                         consistentid_to_last_seen[consistent_id] = (
                                             frame_count
                                         )
-                                        consistent_ids_in_frame.add(consistent_id)
+                                        consistent_ids_in_frame.add(
+                                            consistent_id)
 
                                         keypoints = current_keypoints_list[j]
                                         head, middle, tail = (
@@ -1084,13 +1114,17 @@ def process_video_to_gif_with_angles(
                             for idx in range(len(current_positions)):
                                 if idx not in assigned_indices:
                                     if available_consistent_ids:
-                                        consistent_id = min(available_consistent_ids)
-                                        available_consistent_ids.remove(consistent_id)
-                                        active_consistent_ids.add(consistent_id)
+                                        consistent_id = min(
+                                            available_consistent_ids)
+                                        available_consistent_ids.remove(
+                                            consistent_id)
+                                        active_consistent_ids.add(
+                                            consistent_id)
                                         consistentid_to_last_seen[consistent_id] = (
                                             frame_count
                                         )
-                                        consistent_ids_in_frame.add(consistent_id)
+                                        consistent_ids_in_frame.add(
+                                            consistent_id)
 
                                         keypoints = current_keypoints_list[idx]
                                         head, middle, tail = (
@@ -1218,7 +1252,7 @@ def process_video_to_gif_with_angles(
 
 
 ######################################
-######### Avoidance Detection
+# Avoidance Detection
 ####################################
 
 
@@ -1246,7 +1280,8 @@ def detect_avoidance_behavior_gradual(
     列は 'ID', 'Start_Frame', 'End_Frame', 'Duration'。
     """
     # 必要な列が存在するか確認
-    required_columns = ["ID", "Frame", "Middle_X", "Middle_Y", "Corrected_Angle"]
+    required_columns = ["ID", "Frame",
+                        "Middle_X", "Middle_Y", "Corrected_Angle"]
     for col in required_columns:
         if col not in data.columns:
             raise ValueError(f"必要な列 '{col}' がデータに存在しません。")
@@ -1257,7 +1292,8 @@ def detect_avoidance_behavior_gradual(
 
     for id_value in tqdm(ids, desc="Processing IDs"):
         individual_data = data[data["ID"] == id_value].copy()
-        individual_data = individual_data.sort_values(by="Frame").reset_index(drop=True)
+        individual_data = individual_data.sort_values(
+            by="Frame").reset_index(drop=True)
 
         # Corrected_Angleのスムージング（移動平均）
         window_size = 5  # スムージングのウィンドウサイズ（必要に応じて調整）
@@ -1297,7 +1333,8 @@ def detect_avoidance_behavior_gradual(
                     # 増加期間が条件を満たすか確認
                     if min_increase_frames <= increase_duration <= max_increase_frames:
                         total_angle_increase = (
-                            angles[end_increase_idx] - angles[start_increase_idx]
+                            angles[end_increase_idx] -
+                            angles[start_increase_idx]
                         )
 
                         if total_angle_increase >= angle_increase_threshold:
@@ -1307,7 +1344,8 @@ def detect_avoidance_behavior_gradual(
 
                             while plateau_end_idx < len(angles):
                                 angle_change = np.abs(
-                                    angles[plateau_end_idx] - angles[plateau_start_idx]
+                                    angles[plateau_end_idx] -
+                                    angles[plateau_start_idx]
                                 )
                                 if angle_change <= plateau_threshold:
                                     plateau_end_idx += 1
@@ -1475,24 +1513,24 @@ def correct_angles_per_id(data, threshold=45, accept_threshold=35):
     return corrected_data
 
 
+# Interpolation Part
 
-#### Interpolation Part
 
 def create_kalman_filter(x, y):
     """
     カルマンフィルタを初期化します。
     """
-    kf = KalmanFilter(initial_state_mean=[x, y, 0, 0],
-                      transition_matrices=[[1, 0, 1, 0],
-                                           [0, 1, 0, 1],
-                                           [0, 0, 1, 0],
-                                           [0, 0, 0, 1]],
-                      observation_matrices=[[1, 0, 0, 0],
-                                            [0, 1, 0, 0]],
-                      transition_covariance=0.01 * np.eye(4),
-                      observation_covariance=10.0 * np.eye(2),
-                      initial_state_covariance=100.0 * np.eye(4))
+    kf = KalmanFilter(
+        initial_state_mean=[x, y, 0, 0],
+        transition_matrices=[[1, 0, 1, 0], [
+            0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]],
+        observation_matrices=[[1, 0, 0, 0], [0, 1, 0, 0]],
+        transition_covariance=0.01 * np.eye(4),
+        observation_covariance=10.0 * np.eye(2),
+        initial_state_covariance=100.0 * np.eye(4),
+    )
     return kf
+
 
 def calculate_angle_between_vectors(T, m, H):
     """
@@ -1534,7 +1572,6 @@ def calculate_angle_between_vectors(T, m, H):
     return theta_degrees
 
 
-
 def smooth_trajectory_with_flip_correction(data):
     """
     ラルバのトラッキングデータに対してカルマンフィルタとスプライン補間を適用し、
@@ -1549,29 +1586,44 @@ def smooth_trajectory_with_flip_correction(data):
         pd.DataFrame: 平滑化されたデータ、修正後の Head/Tail、および 'Smoothed_Angle' を含むデータフレーム。
     """
     data = data.copy()
-    ids = data['ID'].unique()
+    ids = data["ID"].unique()
     smoothed_data = []
 
     for id_value in tqdm(ids, desc="Smoothing Trajectories"):
-        id_data = data[data['ID'] == id_value].sort_values(by='Frame')
-        frames = id_data['Frame'].values
+        id_data = data[data["ID"] == id_value].sort_values(by="Frame")
+        frames = id_data["Frame"].values
 
         # 対象の列
-        columns_to_smooth = ['Middle_X', 'Middle_Y', 'Head_X', 'Head_Y', 'Tail_X', 'Tail_Y']
+        columns_to_smooth = [
+            "Middle_X",
+            "Middle_Y",
+            "Head_X",
+            "Head_Y",
+            "Tail_X",
+            "Tail_Y",
+        ]
 
         for col in columns_to_smooth:
             # 欠損値を線形補間で埋める
-            id_data[col] = id_data[col].interpolate(method='linear', limit_direction='both')
+            id_data[col] = id_data[col].interpolate(
+                method="linear", limit_direction="both"
+            )
 
         # 各ペア（X, Y）ごとに平滑化を適用
         smoothed_results = {}
-        for pair in [('Middle_X', 'Middle_Y'), ('Head_X', 'Head_Y'), ('Tail_X', 'Tail_Y')]:
+        for pair in [
+            ("Middle_X", "Middle_Y"),
+            ("Head_X", "Head_Y"),
+            ("Tail_X", "Tail_Y"),
+        ]:
             x_col, y_col = pair
             observations = id_data[[x_col, y_col]].values
 
             # 観測データの形状を確認
             if observations.ndim != 2 or observations.shape[1] != 2:
-                print(f"ID {id_value} の観測データ {pair} の形状が不正です。スキップします。")
+                print(
+                    f"ID {id_value} の観測データ {pair} の形状が不正です。スキップします。"
+                )
                 continue
 
             kf = create_kalman_filter(observations[0, 0], observations[0, 1])
@@ -1586,16 +1638,22 @@ def smooth_trajectory_with_flip_correction(data):
                 k = m - 1 if m > 1 else 0  # k は0以上
                 if k >= 1:
                     # スプライン補間を次数 k で実行
-                    smoothed_x = UnivariateSpline(frames, state_means[:, 0], k=k, s=0)(frames)
-                    smoothed_y = UnivariateSpline(frames, state_means[:, 1], k=k, s=0)(frames)
+                    smoothed_x = UnivariateSpline(frames, state_means[:, 0], k=k, s=0)(
+                        frames
+                    )
+                    smoothed_y = UnivariateSpline(frames, state_means[:, 1], k=k, s=0)(
+                        frames
+                    )
                 else:
                     # データポイントが1つまたは0の場合、そのまま使用
                     smoothed_x = state_means[:, 0]
                     smoothed_y = state_means[:, 1]
             else:
                 # データポイント数が十分な場合は通常通りスプライン補間
-                smoothed_x = UnivariateSpline(frames, state_means[:, 0], s=2)(frames)
-                smoothed_y = UnivariateSpline(frames, state_means[:, 1], s=2)(frames)
+                smoothed_x = UnivariateSpline(
+                    frames, state_means[:, 0], s=2)(frames)
+                smoothed_y = UnivariateSpline(
+                    frames, state_means[:, 1], s=2)(frames)
 
             # 平滑化結果を格納
             smoothed_results[x_col] = smoothed_x
@@ -1603,40 +1661,52 @@ def smooth_trajectory_with_flip_correction(data):
 
         # 平滑化結果を id_data に追加
         for col in smoothed_results:
-            id_data[f'Smoothed_{col}'] = smoothed_results[col]
+            id_data[f"Smoothed_{col}"] = smoothed_results[col]
 
         # 速度計算のためのシフト列を追加
-        id_data['Prev_Smoothed_Middle_X'] = id_data['Smoothed_Middle_X'].shift(1)
-        id_data['Prev_Smoothed_Middle_Y'] = id_data['Smoothed_Middle_Y'].shift(1)
+        id_data["Prev_Smoothed_Middle_X"] = id_data["Smoothed_Middle_X"].shift(
+            1)
+        id_data["Prev_Smoothed_Middle_Y"] = id_data["Smoothed_Middle_Y"].shift(
+            1)
 
         # 速度方向に基づいて Head と Tail を修正
         def correct_flip(row):
             # 平滑化された座標を取得
-            head = np.array([row['Smoothed_Head_X'], row['Smoothed_Head_Y']])
-            tail = np.array([row['Smoothed_Tail_X'], row['Smoothed_Tail_Y']])
-            middle = np.array([row['Smoothed_Middle_X'], row['Smoothed_Middle_Y']])
-            prev_middle = np.array([row['Prev_Smoothed_Middle_X'], row['Prev_Smoothed_Middle_Y']])
-            
+            head = np.array([row["Smoothed_Head_X"], row["Smoothed_Head_Y"]])
+            tail = np.array([row["Smoothed_Tail_X"], row["Smoothed_Tail_Y"]])
+            middle = np.array(
+                [row["Smoothed_Middle_X"], row["Smoothed_Middle_Y"]])
+            prev_middle = np.array(
+                [row["Prev_Smoothed_Middle_X"], row["Prev_Smoothed_Middle_Y"]]
+            )
+
             velocity = middle - prev_middle
-            velocity_dir = velocity / (np.linalg.norm(velocity) + 1e-10)  # 小さい値を足してゼロ除算を防止
-            head_dir = (head - middle) / (np.linalg.norm(head - middle) + 1e-10)
+            velocity_dir = velocity / (
+                np.linalg.norm(velocity) + 1e-10
+            )  # 小さい値を足してゼロ除算を防止
+            head_dir = (head - middle) / \
+                (np.linalg.norm(head - middle) + 1e-10)
             head_dir = (head - middle) / np.linalg.norm(head - middle)
 
             # ベクトルの内積で方向を確認
             if np.dot(velocity_dir, head_dir) < 0:  # 方向が逆の場合
-                return pd.Series({
-                    'Smoothed_Head_X': row['Smoothed_Tail_X'],
-                    'Smoothed_Head_Y': row['Smoothed_Tail_Y'],
-                    'Smoothed_Tail_X': row['Smoothed_Head_X'],
-                    'Smoothed_Tail_Y': row['Smoothed_Head_Y'],
-                })
+                return pd.Series(
+                    {
+                        "Smoothed_Head_X": row["Smoothed_Tail_X"],
+                        "Smoothed_Head_Y": row["Smoothed_Tail_Y"],
+                        "Smoothed_Tail_X": row["Smoothed_Head_X"],
+                        "Smoothed_Tail_Y": row["Smoothed_Head_Y"],
+                    }
+                )
             else:
-                return pd.Series({
-                    'Smoothed_Head_X': row['Smoothed_Head_X'],
-                    'Smoothed_Head_Y': row['Smoothed_Head_Y'],
-                    'Smoothed_Tail_X': row['Smoothed_Tail_X'],
-                    'Smoothed_Tail_Y': row['Smoothed_Tail_Y'],
-                })
+                return pd.Series(
+                    {
+                        "Smoothed_Head_X": row["Smoothed_Head_X"],
+                        "Smoothed_Head_Y": row["Smoothed_Head_Y"],
+                        "Smoothed_Tail_X": row["Smoothed_Tail_X"],
+                        "Smoothed_Tail_Y": row["Smoothed_Tail_Y"],
+                    }
+                )
 
         # Flip の修正結果を id_data に反映
         flip_corrected = id_data.apply(correct_flip, axis=1)
@@ -1644,32 +1714,32 @@ def smooth_trajectory_with_flip_correction(data):
 
         # Smoothed_Angle を計算
         def compute_angle(row):
-            T = np.array([row['Smoothed_Tail_X'], row['Smoothed_Tail_Y']])
-            m = np.array([row['Smoothed_Middle_X'], row['Smoothed_Middle_Y']])
-            H = np.array([row['Smoothed_Head_X'], row['Smoothed_Head_Y']])
+            T = np.array([row["Smoothed_Tail_X"], row["Smoothed_Tail_Y"]])
+            m = np.array([row["Smoothed_Middle_X"], row["Smoothed_Middle_Y"]])
+            H = np.array([row["Smoothed_Head_X"], row["Smoothed_Head_Y"]])
             return calculate_angle_between_vectors(T, m, H)
 
-        id_data['Smoothed_Angle'] = id_data.apply(compute_angle, axis=1)
+        id_data["Smoothed_Angle"] = id_data.apply(compute_angle, axis=1)
 
-        ## Velocity を計算
-        id_data['Speed'] = np.nan  # Speed カラムを初期化
-    
+        # Velocity を計算
+        id_data["Speed"] = np.nan  # Speed カラムを初期化
+
         # 個体（ID）ごとに処理
-        for id_value, group in id_data.groupby('ID'):
-            group = group.sort_values(by='Frame')  # フレーム順にソート
-            dx = group['Smoothed_Middle_X'].diff()  # X座標の変化量
-            dy = group['Smoothed_Middle_Y'].diff()  # Y座標の変化量
+        for id_value, group in id_data.groupby("ID"):
+            group = group.sort_values(by="Frame")  # フレーム順にソート
+            dx = group["Smoothed_Middle_X"].diff()  # X座標の変化量
+            dy = group["Smoothed_Middle_Y"].diff()  # Y座標の変化量
             distance = np.sqrt(dx**2 + dy**2)  # 移動距離
-            frame_diff = group['Frame'].diff()  # フレーム間隔
+            frame_diff = group["Frame"].diff()  # フレーム間隔
             speed = distance / frame_diff  # 距離をフレーム間隔で割る
-            id_data.loc[group.index, 'Speed'] = speed  # 結果を元のデータに追加
+            id_data.loc[group.index, "Speed"] = speed  # 結果を元のデータに追加
 
         smoothed_data.append(id_data)
 
     return pd.concat(smoothed_data).reset_index(drop=True)
 
 
-def detect_contact_flags(data, radius = 15):
+def detect_contact_flags(data, radius=15):
     """
     各フレームで接触フラグを判定する。
 
@@ -1681,24 +1751,29 @@ def detect_contact_flags(data, radius = 15):
         pd.Series: 接触フラグ（True/False）。
     """
     contact_flags = pd.Series(False, index=data.index)  # 初期化（全て False）
-    frames = data['Frame'].unique()
+    frames = data["Frame"].unique()
 
-    for frame in tqdm(frames, desc = 'Checking contacts...'):
-        frame_data = data[data['Frame'] == frame]
+    for frame in tqdm(frames, desc="Checking contacts..."):
+        frame_data = data[data["Frame"] == frame]
 
         for i, row1 in frame_data.iterrows():
-            id1 = row1['ID']
-            head_pos1 = np.array([row1['Smoothed_Middle_X'], row1['Smoothed_Middle_Y']])
+            id1 = row1["ID"]
+            head_pos1 = np.array(
+                [row1["Smoothed_Middle_X"], row1["Smoothed_Middle_Y"]])
 
             for j, row2 in frame_data.iterrows():
-                if id1 == row2['ID']:
+                if id1 == row2["ID"]:
                     continue
                 body_positions = [
-                    np.array([row2['Smoothed_Head_X'], row2['Smoothed_Head_Y']]),
-                    np.array([row2['Smoothed_Middle_X'], row2['Smoothed_Middle_Y']]),
-                    np.array([row2['Smoothed_Tail_X'], row2['Smoothed_Tail_Y']])
+                    np.array([row2["Smoothed_Head_X"],
+                             row2["Smoothed_Head_Y"]]),
+                    np.array([row2["Smoothed_Middle_X"],
+                             row2["Smoothed_Middle_Y"]]),
+                    np.array([row2["Smoothed_Tail_X"],
+                             row2["Smoothed_Tail_Y"]]),
                 ]
-                distances = [np.linalg.norm(head_pos1 - pos) for pos in body_positions]
+                distances = [np.linalg.norm(head_pos1 - pos)
+                             for pos in body_positions]
                 if min(distances) <= radius:
                     contact_flags[i] = True
                     break
@@ -1706,21 +1781,19 @@ def detect_contact_flags(data, radius = 15):
     return contact_flags
 
 
-def judge_state(data, 
-                contact_radius = 15,
-                angle_threshold = 35,
-                speed_threshold = 0.3,
-                frame_interval = 1):
+def judge_state(
+    data, contact_radius=15, angle_threshold=35, speed_threshold=0.3, frame_interval=1
+):
     """
     行動を分類します。
-    
+
     Parameters:
         data (pd.DataFrame): トラッキングデータ。
         contact_radius (float): 接触の判定に使用する距離閾値。
         angle_threshold (float): ターンと判断する角度閾値。
         speed_threshold (float): 移動と判断する速度閾値。
         frame_interval (int): フレームを区切る間隔。1 にするとフレームごとの処理。
-        
+
     Returns:
         pd.DataFrame: 各フレームの行動ラベルを含むデータフレーム。
     """
@@ -1728,18 +1801,21 @@ def judge_state(data,
     # ステップ1: 平滑化と Head/Tail 修正
     data_smoothed = smooth_trajectory_with_flip_correction(data)
     # ステップ2: Contact フラグを計算
-    data_smoothed['Contact'] = detect_contact_flags(data_smoothed, contact_radius)
+    data_smoothed["Contact"] = detect_contact_flags(
+        data_smoothed, contact_radius)
     # ステップ3: 結果を格納するリスト
     behaviors = []
 
     # 個体ごとに処理
-    ids = data_smoothed['ID'].unique()
-    for id_value in tqdm(ids, desc='Classifying Behaviors'):
-        individual_data = data_smoothed[data_smoothed['ID'] == id_value].sort_values(by='Frame')
-        frames = individual_data['Frame'].values
-        angles = individual_data['Smoothed_Angle'].values
-        speeds = individual_data['Speed'].values
-        contacts = individual_data['Contact'].values
+    ids = data_smoothed["ID"].unique()
+    for id_value in tqdm(ids, desc="Classifying Behaviors"):
+        individual_data = data_smoothed[data_smoothed["ID"] == id_value].sort_values(
+            by="Frame"
+        )
+        frames = individual_data["Frame"].values
+        angles = individual_data["Smoothed_Angle"].values
+        speeds = individual_data["Speed"].values
+        contacts = individual_data["Contact"].values
 
         # フレームを frame_interval ごとに間引いて処理
         for i in range(0, len(frames), frame_interval):
@@ -1753,27 +1829,30 @@ def judge_state(data,
 
             # 行動を分類
             if avg_angle >= angle_threshold:
-                behavior = 'Turn'
+                behavior = "Turn"
             elif avg_speed >= speed_threshold:
-                behavior = 'Crawl'
+                behavior = "Crawl"
             else:
-                behavior = 'Pause'
+                behavior = "Pause"
 
             # 各フレームにラベルを付ける
-            behaviors.append({
-                'ID': id_value, 
-                'Frame': frames[i], 
-                'contact_flag': int(contact_flag), 
-                'state': behavior
-            })
-            
+            behaviors.append(
+                {
+                    "ID": id_value,
+                    "Frame": frames[i],
+                    "contact_flag": int(contact_flag),
+                    "state": behavior,
+                }
+            )
+
     # ステップ4: 結果をデータフレームにまとめる
     behavior_df = pd.DataFrame(behaviors)
 
     return behavior_df
 
 
-## Reinforcement Part
+# Reinforcement Part
+
 
 def compute_transition_matrices(data, states):
     """
@@ -1784,13 +1863,13 @@ def compute_transition_matrices(data, states):
     transition_counts_c1_c1 = Counter()
     state_counts_c0 = Counter()
     state_counts_c1 = Counter()
-    
+
     for idx in range(len(data) - 1):
         s_prev = data.iloc[idx]["state_num"]
         s_next = data.iloc[idx + 1]["state_num"]
         c_prev = data.iloc[idx]["contact_flag"]
         c_next = data.iloc[idx + 1]["contact_flag"]
-        
+
         if c_prev == 0:  # 非接触時
             transition_counts_c0[(s_prev, s_next)] += 1
             state_counts_c0[s_prev] += 1
@@ -1800,21 +1879,21 @@ def compute_transition_matrices(data, states):
             elif c_next == 1:
                 transition_counts_c1_c1[(s_prev, s_next)] += 1
             state_counts_c1[s_prev] += 1
-    
+
     # 行列を構築
     P_c0 = np.zeros((len(states), len(states)))
     P_c1_c0 = np.zeros((len(states), len(states)))
     P_c1_c1 = np.zeros((len(states), len(states)))
-    
+
     for (s, s_next), count in transition_counts_c0.items():
         P_c0[s, s_next] = count / state_counts_c0[s]
-    
+
     for (s, s_next), count in transition_counts_c1_c0.items():
         P_c1_c0[s, s_next] = count / state_counts_c1[s]
-    
+
     for (s, s_next), count in transition_counts_c1_c1.items():
         P_c1_c1[s, s_next] = count / state_counts_c1[s]
-    
+
     return P_c0, P_c1_c0, P_c1_c1
 
 
@@ -1825,12 +1904,12 @@ def negative_log_likelihood(v, P_c0, P_c1_c0, P_c1_c1, data, states):
     v = np.array(v)
     z = np.exp(-v)  # desirability function
     log_likelihood = 0
-    
+
     for idx in range(len(data) - 1):
         s_prev = data.iloc[idx]["state_num"]
         s_next = data.iloc[idx + 1]["state_num"]
         c_prev = data.iloc[idx]["contact_flag"]
-        
+
         if c_prev == 0:  # 非接触時
             P_current = P_c0[s_prev, :]
         elif c_prev == 1:  # 接触時
@@ -1848,46 +1927,61 @@ def negative_log_likelihood(v, P_c0, P_c1_c0, P_c1_c1, data, states):
             log_likelihood += np.log(P_current[s_next])
         else:
             log_likelihood += np.log(1e-10)  # 極小値で代用
-    
+
     return -log_likelihood  # 負の対数尤度
 
 
-def calculate_value_funcs(path, contact_radius = 15, angle_threshold = 35, speed_threshold = 0.3, frame_interval = 5):
-    flatten = lambda x: [z for y in x for z in (flatten(y) if hasattr(y, '__iter__') and not isinstance(y, str) else (y,))]
+def calculate_value_funcs(
+    path, contact_radius=15, angle_threshold=35, speed_threshold=0.3, frame_interval=5
+):
+    def flatten(x): return [
+        z
+        for y in x
+        for z in (
+            flatten(y) if hasattr(
+                y, "__iter__") and not isinstance(y, str) else (y,)
+        )
+    ]
 
     df = pd.read_csv(path)
-    behavior_df = judge_state(df,
-                        contact_radius = contact_radius,
-                        angle_threshold = angle_threshold,
-                        speed_threshold = speed_threshold,
-                        frame_interval = frame_interval)
-    behavior_df['contact_and_state'] = behavior_df['contact_flag'].astype(str) + '_' + behavior_df['state']
-    
+    behavior_df = judge_state(
+        df,
+        contact_radius=contact_radius,
+        angle_threshold=angle_threshold,
+        speed_threshold=speed_threshold,
+        frame_interval=frame_interval,
+    )
+    behavior_df["contact_and_state"] = (
+        behavior_df["contact_flag"].astype(str) + "_" + behavior_df["state"]
+    )
+
     contact_and_state_mapping = {
-        '0_Crawl': 0,
-        '0_Turn': 1,
-        '0_Pause': 2,
-        '1_Crawl': 3,
-        '1_Turn': 4,
-        '1_Pause': 5
+        "0_Crawl": 0,
+        "0_Turn": 1,
+        "0_Pause": 2,
+        "1_Crawl": 3,
+        "1_Turn": 4,
+        "1_Pause": 5,
     }
-    
+
     state_mapping = {
-        'Crawl': 0,
-        'Turn': 1,
-        'Pause': 2,
+        "Crawl": 0,
+        "Turn": 1,
+        "Pause": 2,
     }
-    
-    behavior_df['contact_and_state_num'] = behavior_df['contact_and_state'].map(contact_and_state_mapping)
-    behavior_df['state_num'] = behavior_df['state'].map(state_mapping)
+
+    behavior_df["contact_and_state_num"] = behavior_df["contact_and_state"].map(
+        contact_and_state_mapping
+    )
+    behavior_df["state_num"] = behavior_df["state"].map(state_mapping)
     # state全部
     states = sorted(behavior_df["state_num"].unique())
     results = []
     plt.figure(figsize=(35, 35))
-    for id_ in sorted(behavior_df['ID'].unique()):
+    for id_ in sorted(behavior_df["ID"].unique()):
         # IDによる選別
         data = behavior_df[behavior_df.ID == id_]
-        
+
         # 確率遷移行列を計算
         P_c0, P_c1_c0, P_c1_c1 = compute_transition_matrices(data, states)
         # passive data
@@ -1900,13 +1994,13 @@ def calculate_value_funcs(path, contact_radius = 15, angle_threshold = 35, speed
             negative_log_likelihood,
             v_init,
             args=(P_c0, P_c1_c0, P_c1_c1, passive_data, states),
-            method="BFGS"
+            method="BFGS",
         )
         # 推定された価値関数
         v_passive_estimated = result_passive.x
         # contact data
         contact_data = data[data["contact_flag"] == 1]
-        
+
         # 初期値 (v を 0 に初期化)
         v_init = np.zeros(len(states))  # 基本状態の価値関数は3つ
         # 最適化
@@ -1914,12 +2008,21 @@ def calculate_value_funcs(path, contact_radius = 15, angle_threshold = 35, speed
             negative_log_likelihood,
             v_init,
             args=(P_c0, P_c1_c0, P_c1_c1, contact_data, states),
-            method="BFGS"
+            method="BFGS",
         )
-        
+
         # 推定された価値関数
         v_contact_estimated = result_contact.x
         filename = os.path.basename(path)
-        results.append(flatten([filename, id_, v_passive_estimated.tolist(), v_contact_estimated.tolist()]))
+        results.append(
+            flatten(
+                [
+                    filename,
+                    id_,
+                    v_passive_estimated.tolist(),
+                    v_contact_estimated.tolist(),
+                ]
+            )
+        )
 
     return results, pd.DataFrame(results)

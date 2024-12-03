@@ -13,7 +13,7 @@ from summarize_and_plot_interactions import (
     distance_compute,
     plot_distance_compare,
 )
-from scripts.summarize_and_plot_reinforcement_learn import (
+from summarize_and_plot_reinforcement_learn import (
     summarize_reinforce_learn_controls_mutants,
     plot_value_funcs_controls_mutants,
 )
@@ -82,6 +82,7 @@ def main():
         "Checking contacts...{}".format(start_now.strftime("%Y-%m-%d %H:%M:%S")),
         flush=True,
     )
+    control_matrix_files, mutant_matrix_files = select_frames_of_contact_events(thr_frame= Thr_frame)
     contact_time_rate_df = summarize_contacts_time_controls_and_mutants(
         control_matrix_files, mutant_matrix_files
     )
@@ -97,6 +98,7 @@ def main():
 
     ## 逆強化学習
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
+    control_matrix_files, mutant_matrix_files = select_frames(thr_frame=Thr_frame)
     print(
         "Excecuting reinfrocement learning...{}".format(
             start_now.strftime("%Y-%m-%d %H:%M:%S")
