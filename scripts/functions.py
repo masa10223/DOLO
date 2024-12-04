@@ -21,9 +21,7 @@ from scipy.interpolate import UnivariateSpline
 from sklearn.ensemble import IsolationForest
 from scipy.spatial.distance import euclidean
 from collections import Counter
-
 import matplotlib
-
 # フォントの設定を Arial に変更
 matplotlib.rcParams["font.family"] = "Arial"
 matplotlib.rcParams["font.sans-serif"] = ["Arial"]

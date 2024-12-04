@@ -115,7 +115,7 @@ def summarize_contacts_time_controls_and_mutants(control_matrix_files, mutant_ma
     
     return contact_time_rate_df
 
-def plot_contact_time_rate_compare(contact_time_rate_df):
+def plot_contact_time_rate_compare(contact_time_rate_df,filename=None):
     # グループごとの平均接触率を計算
     group_contact_rates = contact_time_rate_df.groupby(['Group', 'Matrix_ID'])['Contact_time_rate'].mean().reset_index()
     # コントロール群と変異体群の接触率データ
@@ -165,7 +165,7 @@ def plot_contact_time_rate_compare(contact_time_rate_df):
     ymin = group_contact_rates['Contact_time_rate'].min()
     h = y_max - ymin
     add_stat_annotation(ax, 0, 1, y_max + h / 30, p_value, h / 10 )
-    plt.savefig('./Fig_paper/contact_time_compare.pdf')
+    plt.savefig(f'./Fig_paper/{filename}/contact_time_compare_{filename}.pdf')
     #plt.show()
 
 def summarize_contacts_count_controls_and_mutants(control_matrix_files, mutant_matrix_files):
@@ -230,7 +230,7 @@ def summarize_contacts_count_controls_and_mutants(control_matrix_files, mutant_m
     
     return contact_count_rate_df
 
-def plot_contact_count_compare(contact_count_rate_df):
+def plot_contact_count_compare(contact_count_rate_df,filename=None):
     # グループごとの平均接触率を計算
     group_contact_rates = contact_count_rate_df.groupby(['Group', 'Matrix_ID'])['Contact_count_rate'].mean().reset_index()
     # コントロール群と変異体群の接触率データ
@@ -286,7 +286,7 @@ def plot_contact_count_compare(contact_count_rate_df):
     ymin = group_contact_rates['Contact_count_rate'].min()
     h = y_max - ymin
     add_stat_annotation(ax, 0, 1, y_max + h / 30, p_value, h / 15 )
-    plt.savefig('./Fig_paper/contact_count_compare.pdf')
+    plt.savefig(f'./Fig_paper/{filename}/contact_count_compare_{filename}.pdf')
 
 def summarize_contacts_time_per_touch_controls_and_mutants(control_matrix_files, mutant_matrix_files):
     # 接触行列のデータを格納するリスト
@@ -350,7 +350,7 @@ def summarize_contacts_time_per_touch_controls_and_mutants(control_matrix_files,
     
     return contact_time_per_touch_df
 
-def plot_contact_time_per_touch_compare(contact_time_per_touch_df):
+def plot_contact_time_per_touch_compare(contact_time_per_touch_df, filename=None):
     # グループごとの平均接触率を計算
     group_contact_rates = contact_time_per_touch_df.groupby(['Group', 'Matrix_ID'])['Total_Contact_time_per_touch'].mean().reset_index()
     # コントロール群と変異体群の接触率データ
@@ -406,7 +406,7 @@ def plot_contact_time_per_touch_compare(contact_time_per_touch_df):
     ymin = group_contact_rates['Total_Contact_time_per_touch'].min()
     h = y_max - ymin
     add_stat_annotation(ax, 0, 1, y_max + h / 30, p_value, h / 15 )
-    plt.savefig('./Fig_paper/contact_time_per_touch_compare.pdf')
+    plt.savefig(f'./Fig_paper/{filename}/contact_time_per_touch_compare_{filename}.pdf')
 
 
 if __name__ == "__main__":

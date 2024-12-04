@@ -1,9 +1,0 @@
-train: /cellpose/scripts/train_annotations_1125
-val: /cellpose/scripts/val_annotations_1125
-nc: 1
-names:
-- pose
-kpt_shape:
-- 3
-- 3
-kpts: 3

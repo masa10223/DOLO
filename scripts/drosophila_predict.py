@@ -17,7 +17,7 @@ def main():
     parser.add_argument(
         "--model_path",
         type=str,
-        default="./runs/pose/train20241129/weights/best.pt",
+        default="./runs/pose/train/weights/best.pt",
     )
     parser.add_argument("--max_id", type=int, default=10)
     parser.add_argument("--conf", type=float, default=1e-4)
@@ -30,7 +30,7 @@ def main():
     max_consistent_id = arguments.max_id
     confidence = arguments.conf
     max_missing_frames = arguments.max_missing_frames
-    model_path = "./runs/pose/train20241129/weights/best.pt"
+    model_path = "./runs/pose/train20241204/weights/best.pt"
 
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
     start = time.time()

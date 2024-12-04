@@ -712,7 +712,7 @@ def distance_compute(PIXEL_TO_CM=0.006):
     return results_combine, results_df, results_df_d
 
 
-def plot_distance_compare(results_combine, results_df, results_df_d):
+def plot_distance_compare(results_combine, results_df, results_df_d, filename = None):
     mutant = results_df_d["avg_distance"]
     control = results_df["avg_distance"]
 
@@ -756,8 +756,8 @@ def plot_distance_compare(results_combine, results_df, results_df_d):
     ax.ticklabel_format(style="sci", axis="x", scilimits=(-2, -2))
     ax.tick_params(axis="y", labelsize=15)
     ax.tick_params(axis="x", labelsize=15)
-    plt.savefig("./Fig_paper/velocity_compare.pdf")
-    print("PDF saved at ./Fig_paper/velocity_compare.pdf")
+    plt.savefig(f"./Fig_paper/{filename}/velocity_compare_{filename}.pdf")
+    print(f"PDF saved at ./Fig_paper/{filename}/velocity_compare_{filename}.pdf")
 
 
     sns.displot(
@@ -774,8 +774,8 @@ def plot_distance_compare(results_combine, results_df, results_df_d):
     ax.ticklabel_format(style="sci", axis="x", scilimits=(-2, -2))
     ax.tick_params(axis="y", labelsize=15)
     ax.tick_params(axis="x", labelsize=15)
-    plt.savefig("./Fig_paper/contact_time_compare_density_all.pdf")
-    print("PDF saved at ./Fig_paper/contact_time_compare_density_all.pdf")
+    plt.savefig(f"./Fig_paper/{filename}/contact_time_compare_density_all_{filename}.pdf")
+    print(f"PDF saved at ./Fig_paper/{filename}/contact_time_compare_density_all_{filename}.pdf")
 
 
 if __name__ == "__main__":
