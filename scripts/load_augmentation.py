@@ -4,10 +4,10 @@ from sklearn.model_selection import train_test_split
 
 
 def main():
-    train_annotations_dir = "train_annotations_1204"
+    train_annotations_dir = "train_annotations_1212"
     # Path to save validation YOLO annotations and images
-    val_annotations_dir = "val_annotations_1204"
-    yaml_path = "./yolo_pose_config_1204.yaml"
+    val_annotations_dir = "val_annotations_1212"
+    yaml_path = "./yolo_pose_config_1212.yaml"
 
     csv_files = [
         "../annotations/annotation_241124double.csv",

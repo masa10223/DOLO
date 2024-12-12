@@ -6,6 +6,8 @@ import yaml
 from sklearn.model_selection import train_test_split
 from imgaug import augmenters as iaa
 from imgaug.augmentables.kps import KeypointsOnImage, Keypoint
+#import albumentations as A
+#from albumentations.core.composition import KeypointParams
 import numpy as np
 import random
 import imageio
@@ -32,7 +34,6 @@ matplotlib.rcParams["mathtext.it"] = "Arial:italic"
 #### Augmentation Part  ####
 ############################
 
-
 def create_yolo_annotations_with_mask(
     df, video_path, mask_dir, annotations_dir, augment=False, target_size=1000
 ):
@@ -58,21 +59,27 @@ def create_yolo_annotations_with_mask(
     # Open the video file
     cap = cv2.VideoCapture(video_path)
 
-    # Augmentation settings
+    # Augmentation settings using iaa.SomeOf
     aug_seq = (
         iaa.Sequential(
-            [
-                iaa.Fliplr(0.5),  # Horizontal flip 50% of the time
+            [ 
+              iaa.Fliplr(0.5),  # Horizontal flip 50% of the time
                 iaa.Affine(
-                    rotate=(-15, 15)
-                ),  # Random rotation between -25 and 25 degrees
-                iaa.Affine(translate_px={"x": (-30, 30), "y": (-10, 10)}),
-                iaa.ScaleX((0.9, 1.1)),  # Random scaling along X-axis
-                iaa.ScaleY((0.9, 1.1)),  # Random scaling along Y-axis
+                    translate_percent={"x": (-0.0625, 0.0625), "y": (-0.0625, 0.0625)}
+                ),
+                iaa.Affine(
+                    rotate=(-25, 25)
+                ),
+                iaa.Affine(scale={"x": (0.9, 1.1), "y": (0.9, 1.1)}),
+                iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),  # Add gaussian noise
+                iaa.AdditivePoissonNoise(lam=(0, 30)),  # Apply poisson noise to simulate camera sensor noise
+                iaa.Multiply((0.9, 1.1)),  # Multiply image by a random value
+                iaa.LinearContrast((0.8, 1.2)),  # Randomly changes the brightness and contrast of the input image
+                iaa.Dropout(p=(0, 0.01)) #Augmenter that sets a certain fraction of pixels in images to zero.
+                #iaa.Grayscale(alpha=(0.0, 1.0)),  # Convert to grayscale with random intensity
+                #iaa.PerspectiveTransform(scale=(0.01, 0.1)),  # Apply perspective transformations
             ]
-        )
-        if augment
-        else None
+        ) if augment else None
     )
 
     # グループ化（frame_idxごとに処理）
@@ -109,7 +116,7 @@ def create_yolo_annotations_with_mask(
 
         # データ拡張が有効な場合、ターゲットサイズまで拡張
         if augment:
-            current_count = len(group)
+            current_count = 0
             while current_count < target_size:
                 aug_frame, aug_group = apply_augmentation(
                     masked_frame, group, aug_seq)
@@ -121,7 +128,7 @@ def create_yolo_annotations_with_mask(
                     current_count,
                     augmented=True,
                 )
-                current_count += len(aug_group)
+                current_count += 1
 
     # ビデオキャプチャを解放
     cap.release()
@@ -189,7 +196,7 @@ def create_yolo_annotations(
         if not ret:
             print(f"Error: Could not read the frame at index {frame_idx}.")
             continue
-
+ 
         # Save the original frame and annotation
         save_frame_and_annotation(frame, group, annotations_dir, frame_idx, 0)
 
@@ -609,13 +616,13 @@ def annotate_frame_with_keypoints(
         ax.scatter(tail[0], tail[1], color=color, s=60, marker="^")
 
         # Display angle θ near the middle point
-        ax.text(
-            middle[0] + 10,
-            middle[1] + 10,
-            f"ID:{consistent_id},\n θ={theta:.1f}°",
-            color=color,
-            fontsize=16,
-        )
+        # ax.text(
+        #     middle[0] + 10,
+        #     middle[1] + 10,
+        #     f"ID:{consistent_id},\n θ={theta:.1f}°",
+        #     color=color,
+        #     fontsize=16,
+        # )
 
     # Remove axis
     ax.axis("off")
@@ -868,6 +875,8 @@ def process_video_to_gif_with_angles(
     distance_threshold=50,
     max_missing_frames=30,
     max_consistent_ids=15,
+    start_frame = None,
+    end_frame = None
 ):
     """
     動画を処理し、キーポイントと角度を注釈として付与したGIFを生成する。
@@ -886,8 +895,21 @@ def process_video_to_gif_with_angles(
     except Exception as e:
         print(f"ビデオファイルのオープンエラー: {e}")
         return
+    
 
-    frame_count = 0
+    # 総フレーム数を取得
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    # start_frame と end_frame のデフォルト設定
+    if start_frame is None:
+        start_frame = 0
+    if end_frame is None or end_frame > total_frames:
+        end_frame = total_frames
+
+    # 開始フレームにシーク
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+    frame_count = start_frame
     # マッピングとデータ構造の初期化
     consistentid_to_last_keypoints = {}
     consistentid_to_last_position = {}
@@ -937,7 +959,7 @@ def process_video_to_gif_with_angles(
                 ]
             )
 
-            while cap.isOpened():
+            while cap.isOpened() and frame_count < end_frame:
                 ret, frame = cap.read()
                 if not ret:
                     print(

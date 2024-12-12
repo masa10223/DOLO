@@ -141,7 +141,7 @@ def plot_value_funcs_controls_mutants(
     plt.xlabel("", fontsize=20)
     plt.ylabel("Value", fontsize=20)
     plt.ylim([-1, 1])
-    plt.savefig(f"./Fig_paper/{filename}value_compare_boxplot_{filename}.pdf")
+    plt.savefig(f"./Fig_paper/{filename}/value_compare_boxplot_{filename}.pdf")
 
     ## Mean Compare
     df_filtered_mean = df_filtered.groupby("group").mean()

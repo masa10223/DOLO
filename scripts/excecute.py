@@ -58,51 +58,51 @@ def main():
     matplotlib.rcParams["font.sans-serif"] = ["Arial"]
     matplotlib.rcParams["mathtext.it"] = "Arial:italic"
 
-    # ### 抽出したデータフレームの確認
-    # start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
-    # print(
-    #     "Extracting frames...{}".format(start_now.strftime("%Y-%m-%d %H:%M:%S")),
-    #     flush=True,
-    # )
-    # control_matrix_files, mutant_matrix_files = select_frames(thr_frame=Thr_frame)
-    # ##　相互作用の確認
-    # start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
-    # print(
-    #     "Checking interactions...{}".format(start_now.strftime("%Y-%m-%d %H:%M:%S")),
-    #     flush=True,
-    # )
-    # summarize_initeractions_controls_and_mutants(
-    #     control_matrix_files,
-    #     mutant_matrix_files,
-    #     head_radius=Head_radius,
-    #     max_gap=max_gap,
-    #     max_displacement=max_displacement,
-    # )
-    # results_combine, results_df, results_df_d = distance_compute(
-    #     PIXEL_TO_CM=PIXEL_TO_CM
-    # )
-    # plot_distance_compare(results_combine, results_df, results_df_d)
-    # ## Contactの確認
-    # start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
-    # print(
-    #     "Checking contacts...{}".format(start_now.strftime("%Y-%m-%d %H:%M:%S")),
-    #     flush=True,
-    # )
-    # control_matrix_files, mutant_matrix_files = select_frames_of_contact_events(
-    #     thr_frame=Thr_frame
-    # )
-    # contact_time_rate_df = summarize_contacts_time_controls_and_mutants(
-    #     control_matrix_files, mutant_matrix_files
-    # )
-    # plot_contact_time_rate_compare(contact_time_rate_df)
-    # contact_count_rate_df = summarize_contacts_count_controls_and_mutants(
-    #     control_matrix_files, mutant_matrix_files
-    # )
-    # plot_contact_count_compare(contact_count_rate_df)
-    # contact_time_per_touch_df = summarize_contacts_time_per_touch_controls_and_mutants(
-    #     control_matrix_files, mutant_matrix_files
-    # )
-    # plot_contact_time_per_touch_compare(contact_time_per_touch_df)
+    ### 抽出したデータフレームの確認
+    start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
+    print(
+        "Extracting frames...{}".format(start_now.strftime("%Y-%m-%d %H:%M:%S")),
+        flush=True,
+    )
+    control_matrix_files, mutant_matrix_files = select_frames(thr_frame=Thr_frame)
+    ##　相互作用の確認
+    start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
+    print(
+        "Checking interactions...{}".format(start_now.strftime("%Y-%m-%d %H:%M:%S")),
+        flush=True,
+    )
+    summarize_initeractions_controls_and_mutants(
+        control_matrix_files,
+        mutant_matrix_files,
+        head_radius=Head_radius,
+        max_gap=max_gap,
+        max_displacement=max_displacement,
+    )
+    results_combine, results_df, results_df_d = distance_compute(
+        PIXEL_TO_CM=PIXEL_TO_CM
+    )
+    plot_distance_compare(results_combine, results_df, results_df_d, filename=filename)
+    ## Contactの確認
+    start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
+    print(
+        "Checking contacts...{}".format(start_now.strftime("%Y-%m-%d %H:%M:%S")),
+        flush=True,
+    )
+    control_matrix_files, mutant_matrix_files = select_frames_of_contact_events(
+        thr_frame=Thr_frame
+    )
+    contact_time_rate_df = summarize_contacts_time_controls_and_mutants(
+        control_matrix_files, mutant_matrix_files
+    )
+    plot_contact_time_rate_compare(contact_time_rate_df, filename=filename)
+    contact_count_rate_df = summarize_contacts_count_controls_and_mutants(
+        control_matrix_files, mutant_matrix_files
+    )
+    plot_contact_count_compare(contact_count_rate_df, filename=filename)
+    contact_time_per_touch_df = summarize_contacts_time_per_touch_controls_and_mutants(
+        control_matrix_files, mutant_matrix_files
+    )
+    plot_contact_time_per_touch_compare(contact_time_per_touch_df, filename=filename)
 
     ## 逆強化学習
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
@@ -123,7 +123,7 @@ def main():
             frame_interval=frame_interval,
         )
     )
-    plot_value_funcs_controls_mutants(control_results_dfs, mutants_results_dfs)
+    plot_value_funcs_controls_mutants(control_results_dfs, mutants_results_dfs, filename=filename)
 
 
 if __name__ == "__main__":
