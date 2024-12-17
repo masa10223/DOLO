@@ -545,6 +545,27 @@ def select_frames(thr_frame = 5000):
             
     return control_matrix_files, mutant_matrix_files
 
+def selected_frames(thr_frame = 5000): 
+    control_matrix_files = []
+    for path in natsorted(glob.glob('./csvs/selected_trajectory/C*')):
+        print(f"Selecting frames from {path}")
+        tmp_df = pd.read_csv(path)
+        total_frames = tmp_df['Frame'].max() + 1
+        if total_frames > thr_frame:
+            print(path)
+            control_matrix_files.append(path)
+
+    mutant_matrix_files = []
+    for path in natsorted(glob.glob('./csvs/selected_trajectory/D*')):
+        print(f"Selecting frames from {path}")
+        tmp_df = pd.read_csv(path)
+        total_frames = tmp_df['Frame'].max() + 1
+        if total_frames > thr_frame:
+            print(path)
+            mutant_matrix_files.append(path)
+            
+    return control_matrix_files, mutant_matrix_files
+
 def summarize_initeractions_controls(control_matrix_files, head_radius=15, max_gap=5, max_displacement=20):
     for control_path in tqdm(
         control_matrix_files, desc="Collecting Controls..."

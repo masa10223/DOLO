@@ -10,6 +10,7 @@ from summarize_and_plot_contacts import (
 from summarize_and_plot_interactions import (
     summarize_initeractions_controls_and_mutants,
     select_frames,
+    selected_frames,
     distance_compute,
     plot_distance_compare,
 )
@@ -65,6 +66,7 @@ def main():
         flush=True,
     )
     control_matrix_files, mutant_matrix_files = select_frames(thr_frame=Thr_frame)
+    
     ##　相互作用の確認
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
     print(
