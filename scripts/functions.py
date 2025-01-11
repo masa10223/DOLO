@@ -6,8 +6,9 @@ import yaml
 from sklearn.model_selection import train_test_split
 from imgaug import augmenters as iaa
 from imgaug.augmentables.kps import KeypointsOnImage, Keypoint
-#import albumentations as A
-#from albumentations.core.composition import KeypointParams
+
+# import albumentations as A
+# from albumentations.core.composition import KeypointParams
 import numpy as np
 import random
 import imageio
@@ -24,6 +25,7 @@ from sklearn.ensemble import IsolationForest
 from scipy.spatial.distance import euclidean
 from collections import Counter
 import matplotlib
+
 # フォントの設定を Arial に変更
 matplotlib.rcParams["font.family"] = "Arial"
 matplotlib.rcParams["font.sans-serif"] = ["Arial"]
@@ -33,6 +35,7 @@ matplotlib.rcParams["mathtext.it"] = "Arial:italic"
 ############################
 #### Augmentation Part  ####
 ############################
+
 
 def create_yolo_annotations_with_mask(
     df, video_path, mask_dir, annotations_dir, augment=False, target_size=1000
@@ -62,24 +65,30 @@ def create_yolo_annotations_with_mask(
     # Augmentation settings using iaa.SomeOf
     aug_seq = (
         iaa.Sequential(
-            [ 
-              iaa.Fliplr(0.5),  # Horizontal flip 50% of the time
+            [
+                iaa.Fliplr(0.5),  # Horizontal flip 50% of the time
                 iaa.Affine(
                     translate_percent={"x": (-0.0625, 0.0625), "y": (-0.0625, 0.0625)}
                 ),
-                iaa.Affine(
-                    rotate=(-25, 25)
-                ),
+                iaa.Affine(rotate=(-25, 25)),
                 iaa.Affine(scale={"x": (0.9, 1.1), "y": (0.9, 1.1)}),
                 iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),  # Add gaussian noise
-                iaa.AdditivePoissonNoise(lam=(0, 30)),  # Apply poisson noise to simulate camera sensor noise
+                iaa.AdditivePoissonNoise(
+                    lam=(0, 30)
+                ),  # Apply poisson noise to simulate camera sensor noise
                 iaa.Multiply((0.9, 1.1)),  # Multiply image by a random value
-                iaa.LinearContrast((0.8, 1.2)),  # Randomly changes the brightness and contrast of the input image
-                iaa.Dropout(p=(0, 0.01)) #Augmenter that sets a certain fraction of pixels in images to zero.
-                #iaa.Grayscale(alpha=(0.0, 1.0)),  # Convert to grayscale with random intensity
-                #iaa.PerspectiveTransform(scale=(0.01, 0.1)),  # Apply perspective transformations
+                iaa.LinearContrast(
+                    (0.8, 1.2)
+                ),  # Randomly changes the brightness and contrast of the input image
+                iaa.Dropout(
+                    p=(0, 0.01)
+                ),  # Augmenter that sets a certain fraction of pixels in images to zero.
+                # iaa.Grayscale(alpha=(0.0, 1.0)),  # Convert to grayscale with random intensity
+                # iaa.PerspectiveTransform(scale=(0.01, 0.1)),  # Apply perspective transformations
             ]
-        ) if augment else None
+        )
+        if augment
+        else None
     )
 
     # グループ化（frame_idxごとに処理）
@@ -98,8 +107,7 @@ def create_yolo_annotations_with_mask(
         # マスク画像の読み込み
         mask_path = os.path.join(mask_dir, f"{frame_idx}.tif")
         if not os.path.exists(mask_path):
-            print(
-                f"Warning: Mask image for frame {frame_idx} not found. Skipping.")
+            print(f"Warning: Mask image for frame {frame_idx} not found. Skipping.")
             continue
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
@@ -111,15 +119,13 @@ def create_yolo_annotations_with_mask(
         masked_frame = cv2.bitwise_and(frame, frame, mask=mask)
 
         # フレームとアノテーションを保存
-        save_frame_and_annotation(
-            masked_frame, group, annotations_dir, frame_idx, 0)
+        save_frame_and_annotation(masked_frame, group, annotations_dir, frame_idx, 0)
 
         # データ拡張が有効な場合、ターゲットサイズまで拡張
         if augment:
             current_count = 0
             while current_count < target_size:
-                aug_frame, aug_group = apply_augmentation(
-                    masked_frame, group, aug_seq)
+                aug_frame, aug_group = apply_augmentation(masked_frame, group, aug_seq)
                 save_frame_and_annotation(
                     aug_frame,
                     aug_group,
@@ -164,20 +170,24 @@ def create_yolo_annotations(
         iaa.Sequential(
             [
                 iaa.Fliplr(0.5),  # Horizontal flip 50% of the time
-                iaa.ShiftScaleRotate(shift_limit=(-0.0625, 0.0625),
-                                     scale_limit=(-0.1, 0.1),
-                                     rotate_limit=(-25, 25),
-                                     p=0.1),  # Add random affine transformation ## default
-                iaa.SafeRotate(limit=(-25,25),
-                               p = 0.1), # Rotate the input inside the input's frame by an angle selected randomly from the uniform distribution.
+                iaa.ShiftScaleRotate(
+                    shift_limit=(-0.0625, 0.0625),
+                    scale_limit=(-0.1, 0.1),
+                    rotate_limit=(-25, 25),
+                    p=0.1,
+                ),  # Add random affine transformation ## default
+                iaa.SafeRotate(
+                    limit=(-25, 25), p=0.1
+                ),  # Rotate the input inside the input's frame by an angle selected randomly from the uniform distribution.
                 iaa.GaussNoize(p=0.1),  # Add gaussian noise
                 # Apply poisson noise to an image to simulate camera sensor noise.
                 iaa.ISONoise(),
-                iaa.MultiplicativeNoise(multiplier=(0.9, 1.1),
-                                        p=0.1),  # Multiply image and random array
-                iaa.RandomBrightnessContrast(brightness_limit=(-0.2, 0.2),
-                                             contrast_limit=(-0.2, 0.2),
-                                             p=0.1),  # Randomly changes the brightness and contrast of the input image.
+                iaa.MultiplicativeNoise(
+                    multiplier=(0.9, 1.1), p=0.1
+                ),  # Multiply image and random array
+                iaa.RandomBrightnessContrast(
+                    brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2), p=0.1
+                ),  # Randomly changes the brightness and contrast of the input image.
             ]
         )
         if augment
@@ -196,7 +206,7 @@ def create_yolo_annotations(
         if not ret:
             print(f"Error: Could not read the frame at index {frame_idx}.")
             continue
- 
+
         # Save the original frame and annotation
         save_frame_and_annotation(frame, group, annotations_dir, frame_idx, 0)
 
@@ -204,8 +214,7 @@ def create_yolo_annotations(
         if augment:
             current_count = len(group)
             while current_count < target_size:
-                aug_frame, aug_group = apply_augmentation(
-                    frame, group, aug_seq)
+                aug_frame, aug_group = apply_augmentation(frame, group, aug_seq)
                 save_frame_and_annotation(
                     aug_frame,
                     aug_group,
@@ -279,8 +288,7 @@ def create_yolo_annotations_from_images(
         if augment:
             current_count = len(group)
             while current_count < target_size:
-                aug_image, aug_group = apply_augmentation(
-                    image, group, aug_seq)
+                aug_image, aug_group = apply_augmentation(image, group, aug_seq)
                 save_frame_and_annotation(
                     aug_image,
                     aug_group,
@@ -573,6 +581,27 @@ def calculate_angle_between_vectors(T, m, H):
     return theta_degrees
 
 
+def simple_smoothness_score(frames_data):
+    """
+    直近フレーム群 frames_data (list[dict]) から "スコア" を算出（簡易版）
+    """
+    if len(frames_data) <= 1:
+        return 0.0
+    dist_score = 0.0
+    angle_score = 0.0
+    for i in range(1, len(frames_data)):
+        prev = frames_data[i - 1]
+        curr = frames_data[i]
+        dist_head = np.linalg.norm(np.array(curr["Head"]) - np.array(prev["Head"]))
+        dist_tail = np.linalg.norm(np.array(curr["Tail"]) - np.array(prev["Tail"]))
+        dist_score += dist_head + dist_tail
+        diff_angle = abs(curr["Angle"] - prev["Angle"])
+        if diff_angle > 180:
+            diff_angle = 360 - diff_angle
+        angle_score += diff_angle
+    return dist_score + 0.5 * angle_score
+
+
 def annotate_frame_with_keypoints(
     img, keypoints_list, ids_list, angles_list, frame_number, id_to_color
 ):
@@ -656,8 +685,7 @@ def annotate_frame_with_keypoints(
             markerfacecolor="gray",
             markersize=10,
         ),
-        Line2D([0], [0], marker="x", color="gray",
-               label="Middle", markersize=10),
+        Line2D([0], [0], marker="x", color="gray", label="Middle", markersize=10),
         Line2D(
             [0],
             [0],
@@ -670,8 +698,7 @@ def annotate_frame_with_keypoints(
     ]
 
     # Combine legends
-    first_legend = ax.legend(handles=legend_elements,
-                             loc="upper right", title="IDs")
+    first_legend = ax.legend(handles=legend_elements, loc="upper right", title="IDs")
     ax.add_artist(first_legend)
     ax.legend(handles=marker_elements, loc="upper left", title="Keypoints")
 
@@ -780,13 +807,12 @@ def ensure_head_in_direction_of_accumulated_movement(
 
     # Keep only the last 2N positions
     if len(positions_history[consistent_id]) > 2 * N:
-        positions_history[consistent_id] = positions_history[consistent_id][-2 * N:]
+        positions_history[consistent_id] = positions_history[consistent_id][-2 * N :]
 
     # Calculate movement vector
     if len(positions_history[consistent_id]) >= N:
         movement_vector = (
-            positions_history[consistent_id][-1] -
-            positions_history[consistent_id][-N]
+            positions_history[consistent_id][-1] - positions_history[consistent_id][-N]
         )
         movement_distance = np.linalg.norm(movement_vector)
 
@@ -797,11 +823,9 @@ def ensure_head_in_direction_of_accumulated_movement(
             if not orientation_fixed[consistent_id]:
                 # Vectors from middle to head and tail
                 head_vector = head - middle
-                head_vector = head_vector / \
-                    (np.linalg.norm(head_vector) + 1e-6)
+                head_vector = head_vector / (np.linalg.norm(head_vector) + 1e-6)
                 tail_vector = tail - middle
-                tail_vector = tail_vector / \
-                    (np.linalg.norm(tail_vector) + 1e-6)
+                tail_vector = tail_vector / (np.linalg.norm(tail_vector) + 1e-6)
 
                 # Compare dot products
                 head_similarity = np.dot(movement_vector, head_vector)
@@ -809,11 +833,9 @@ def ensure_head_in_direction_of_accumulated_movement(
 
                 # Decide correct orientation
                 if head_similarity >= tail_similarity:
-                    head_tail_mapping[consistent_id] = {
-                        "head": "head", "tail": "tail"}
+                    head_tail_mapping[consistent_id] = {"head": "head", "tail": "tail"}
                 else:
-                    head_tail_mapping[consistent_id] = {
-                        "head": "tail", "tail": "head"}
+                    head_tail_mapping[consistent_id] = {"head": "tail", "tail": "head"}
                     head, tail = tail, head  # Swap head and tail
 
                 orientation_fixed[consistent_id] = True
@@ -832,8 +854,7 @@ def ensure_head_in_direction_of_accumulated_movement(
                     # 角度の変化を計算
                     angle_change = np.arccos(
                         np.clip(
-                            np.dot(movement_vector,
-                                   previous_movement_vector), -1.0, 1.0
+                            np.dot(movement_vector, previous_movement_vector), -1.0, 1.0
                         )
                     )
                     angle_change_degrees = np.degrees(angle_change)
@@ -844,16 +865,14 @@ def ensure_head_in_direction_of_accumulated_movement(
 
         else:
             # Movement is too small, use angle-based method
-            head, middle, tail = determine_head_tail_based_on_angle(
-                head, middle, tail)
+            head, middle, tail = determine_head_tail_based_on_angle(head, middle, tail)
             orientation_fixed[consistent_id] = (
                 True  # Assume orientation is fixed for now
             )
 
     else:
         # Not enough data, use angle-based method
-        head, middle, tail = determine_head_tail_based_on_angle(
-            head, middle, tail)
+        head, middle, tail = determine_head_tail_based_on_angle(head, middle, tail)
         # Assume orientation is fixed for now
         orientation_fixed[consistent_id] = True
 
@@ -875,70 +894,71 @@ def process_video_to_gif_with_angles(
     distance_threshold=50,
     max_missing_frames=30,
     max_consistent_ids=15,
-    start_frame = None,
-    end_frame = None
+    start_frame=None,
+    end_frame=None,
+    # 複数フレームで手動割り当てを行えるようにする
+    manual_assignments=None,  # { frameIdx: { ID: box_idx, ... } }
+    smoothing_window=5,
 ):
     """
-    動画を処理し、キーポイントと角度を注釈として付与したGIFを生成する。
-    キーポイントの位置と角度のデータをCSVにも保存する。
+    1) manual_assignments により複数フレームでの手動割り当て
+    2) 移動方向補正 (ensure_head_in_direction_of_accumulated_movement)
+    3) 直近フレーム群(smoothing_window)でスコア計算し、スワップが有利ならスワップ
     """
     from imageio import get_writer
-
+    # ---------------------
+    # YOLOロード
+    # ---------------------
     try:
         model = YOLO(model_path)
     except Exception as e:
-        print(f"YOLOモデルの読み込みエラー: {e}")
+        print(f"YOLOモデル読込エラー: {e}")
         return
 
-    try:
-        cap = cv2.VideoCapture(video_path)
-    except Exception as e:
-        print(f"ビデオファイルのオープンエラー: {e}")
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"ビデオファイルを開けません: {video_path}")
         return
-    
 
-    # 総フレーム数を取得
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    # start_frame と end_frame のデフォルト設定
     if start_frame is None:
         start_frame = 0
     if end_frame is None or end_frame > total_frames:
         end_frame = total_frames
-
-    # 開始フレームにシーク
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-
     frame_count = start_frame
-    # マッピングとデータ構造の初期化
-    consistentid_to_last_keypoints = {}
+
+    # ---------------------
+    # ID管理用の辞書
+    # ---------------------
     consistentid_to_last_position = {}
-    consistentid_to_last_theta = {}
     consistentid_to_velocity = {}
-    # 一貫した色割り当ての初期化
+    consistentid_to_last_seen = {}
+    consistentid_to_last_data = {}
+    consistentid_recent_frames = (
+        {}
+    )  # ID -> list of row(dict): {"Head","Middle","Tail","Angle"}
+
+    # ムーブメント補正用
+    positions_history = {}
+    orientation_fixed = {}
+    head_tail_mapping = {}
+
+    # カラー割り当て
     id_to_color = {}
     color_palette = plt.get_cmap("tab20", 10)
-    for consistent_id in range(1, max_consistent_ids + 1):
-        color_index = (consistent_id - 1) % color_palette.N
+    for cid in range(1, max_consistent_ids + 1):
+        color_index = (cid - 1) % color_palette.N
         color = color_palette(color_index)[:3]
-        id_to_color[consistent_id] = color
+        id_to_color[cid] = color
 
-    # 新しいデータ構造の初期化
-    positions_history = {}  # 各IDの過去のmiddle位置を保存
-    orientation_fixed = {}  # 各IDの方向が固定されたかどうか
-    head_tail_mapping = {}  # 各IDのheadとtailのマッピング
-
-    max_missing_frames = 50
-    consistentid_to_last_seen = {}
     available_consistent_ids = set(range(1, max_consistent_ids + 1))
     active_consistent_ids = set()
 
-    # GIFとCSVの準備
     try:
-        gif_writer = imageio.get_writer(
-            output_gif_path, mode="I", fps=10, loop=0)
+        gif_writer = imageio.get_writer(output_gif_path, mode="I", fps=10, loop=0)
     except Exception as e:
-        print(f"GIFライターの初期化中にエラーが発生しました: {e}")
+        print(f"GIFライター初期化失敗: {e}")
         cap.release()
         return
 
@@ -956,319 +976,602 @@ def process_video_to_gif_with_angles(
                     "Tail_X",
                     "Tail_Y",
                     "Angle",
+                    "Swapped_In_Smoothing",
                 ]
             )
 
             while cap.isOpened() and frame_count < end_frame:
-                ret, frame = cap.read()
+                ret, frame_org = cap.read()
                 if not ret:
-                    print(
-                        f"フレーム {frame_count}: フレームを読み込めないか、ビデオの終了です。"
-                    )
                     break
 
-                # フレームスキップ
                 if frame_count % frame_skip != 0:
                     frame_count += 1
                     continue
 
-                # YOLOモデル推論
+                # ---------------------
+                # YOLO推論
+                # ---------------------
                 try:
-                    results = model(frame, conf=confidence)
+                    results = model(frame_org, conf=confidence)
                 except Exception as e:
-                    print(f"フレーム {frame_count}: モデル推論中のエラー - {e}")
+                    print(f"フレーム {frame_count}: 推論エラー - {e}")
                     frame_count += 1
                     continue
 
                 keypoints_list = []
                 ids_list = []
                 angles_list = []
-                consistent_ids_in_frame = set()
+                swapped_in_smoothing_flags = []
 
+                current_positions = []
+                current_keypoints_list = []
                 if results:
                     result = results[0]
                     if result.keypoints is not None:
                         keypoints_data = result.keypoints.data.cpu().numpy()
-                        num_instances = keypoints_data.shape[0]
-
-                        current_positions = []
-                        current_keypoints_list = []
-
-                        for idx in range(num_instances):
-                            keypoints = keypoints_data[idx]
-                            if keypoints.shape[0] >= 3:
-                                tail = keypoints[2, :2]
-                                middle = keypoints[1, :2]
-                                head = keypoints[0, :2]
-
-                                current_positions.append(middle)
+                        num_inst = keypoints_data.shape[0]
+                        for idx in range(num_inst):
+                            kpt = keypoints_data[idx]
+                            if kpt.shape[0] >= 3:
+                                tail_xy = kpt[2, :2]
+                                middle_xy = kpt[1, :2]
+                                head_xy = kpt[0, :2]
+                                current_positions.append(middle_xy)
                                 current_keypoints_list.append(
-                                    {"head": head, "middle": middle, "tail": tail}
+                                    {
+                                        "head": head_xy,
+                                        "middle": middle_xy,
+                                        "tail": tail_xy,
+                                    }
                                 )
 
-                        # IDの一致処理
-                        if current_positions:
-                            # 予測位置の計算
-                            predicted_positions = []
-                            for cid in consistentid_to_last_position:
-                                last_position = consistentid_to_last_position[cid]
-                                velocity = consistentid_to_velocity.get(
-                                    cid, np.array([0, 0])
+                # ---------------------
+                # (A) 複数フレームでの手動割り当てロジック
+                # ---------------------
+                # 「フレーム frame_count が manual_assignments に含まれている」場合は、そのフレームだけ強制割当
+                if (
+                    (manual_assignments is not None)
+                    and (frame_count in manual_assignments)
+                    and len(current_positions) > 0
+                ):
+                    assigned_indices = set()
+                    assigned_cids = set()
+
+                    # 1) 手動割り当て
+                    manual_dict = manual_assignments[
+                        frame_count
+                    ]  # { cid: box_idx, ...}
+                    for cid, box_idx in manual_dict.items():
+                        if box_idx < 0 or box_idx >= len(current_keypoints_list):
+                            print(
+                                f"[WARNING] 手動割当: frame={frame_count}, cid={cid}, box_idx={box_idx} が範囲外"
+                            )
+                            continue
+                        if (
+                            cid not in available_consistent_ids
+                            and cid not in active_consistent_ids
+                        ):
+                            # 既に活性化していてまだ外れていないならOK
+                            print(
+                                f"[WARNING] ID {cid} は使えません. (既に解放or使い済みの可能性)"
+                            )
+                            continue
+
+                        # 強制割当
+                        kp = current_keypoints_list[box_idx]
+                        head_xy, middle_xy, tail_xy = (
+                            kp["head"],
+                            kp["middle"],
+                            kp["tail"],
+                        )
+                        # 移動方向に合わせる
+                        head_xy, middle_xy, tail_xy = (
+                            ensure_head_in_direction_of_accumulated_movement(
+                                head_xy,
+                                middle_xy,
+                                tail_xy,
+                                cid,
+                                positions_history,
+                                orientation_fixed,
+                                head_tail_mapping,
+                            )
+                        )
+                        angle_val = calculate_angle_between_vectors(
+                            tail_xy, middle_xy, head_xy
+                        )
+
+                        if cid in available_consistent_ids:
+                            available_consistent_ids.remove(cid)
+                            active_consistent_ids.add(cid)
+
+                        consistentid_to_last_position[cid] = middle_xy
+                        if cid not in consistentid_to_velocity:
+                            consistentid_to_velocity[cid] = np.array([0, 0])
+                        consistentid_to_last_seen[cid] = frame_count
+                        consistentid_to_last_data[cid] = {
+                            "Head": head_xy,
+                            "Middle": middle_xy,
+                            "Tail": tail_xy,
+                            "Angle": angle_val,
+                        }
+                        consistentid_recent_frames.setdefault(cid, []).append(
+                            consistentid_to_last_data[cid]
+                        )
+                        if len(consistentid_recent_frames[cid]) > smoothing_window:
+                            consistentid_recent_frames[cid].pop(0)
+
+                        assigned_indices.add(box_idx)
+                        assigned_cids.add(cid)
+
+                        keypoints_list.append(
+                            {"head": head_xy, "middle": middle_xy, "tail": tail_xy}
+                        )
+                        ids_list.append(cid)
+                        angles_list.append(angle_val)
+                        swapped_in_smoothing_flags.append(False)
+
+                        # CSV
+                        csv_writer.writerow(
+                            [
+                                frame_count,
+                                cid,
+                                head_xy[0],
+                                head_xy[1],
+                                middle_xy[0],
+                                middle_xy[1],
+                                tail_xy[0],
+                                tail_xy[1],
+                                angle_val,
+                                False,
+                            ]
+                        )
+
+                    # 2) その他の box は Hungarian で既存IDに割り当て
+                    remaining_positions = []
+                    remaining_keypoints_list = []
+                    remaining_idx_map = []
+                    for i in range(len(current_positions)):
+                        if i not in assigned_indices:
+                            remaining_positions.append(current_positions[i])
+                            remaining_keypoints_list.append(current_keypoints_list[i])
+                            remaining_idx_map.append(i)
+
+                    existing_cid_list = list(active_consistent_ids)
+                    predicted_positions = []
+                    for ccid in existing_cid_list:
+                        lastp = consistentid_to_last_position[ccid]
+                        vel = consistentid_to_velocity.get(ccid, np.array([0, 0]))
+                        predicted_positions.append(lastp + vel)
+
+                    #  2-1) Hungarian
+                    if len(predicted_positions) > 0 and len(remaining_positions) > 0:
+                        cost_mat = np.zeros(
+                            (len(predicted_positions), len(remaining_positions))
+                        )
+                        for i, predp in enumerate(predicted_positions):
+                            for j, curp in enumerate(remaining_positions):
+                                cost_mat[i, j] = np.linalg.norm(curp - predp)
+                        row_ind, col_ind = linear_sum_assignment(cost_mat)
+                        for i, j in zip(row_ind, col_ind):
+                            if cost_mat[i, j] < distance_threshold:
+                                ccid = existing_cid_list[i]
+                                assigned_indices.add(remaining_idx_map[j])
+                                kp = remaining_keypoints_list[j]
+                                head_xy, middle_xy, tail_xy = (
+                                    kp["head"],
+                                    kp["middle"],
+                                    kp["tail"],
                                 )
-                                predicted_position = last_position + velocity
-                                predicted_positions.append(predicted_position)
-
-                            # 変数を初期化
-                            assigned_indices = set()
-                            assigned_cids = set()
-                            cid_list = list(
-                                consistentid_to_last_position.keys())
-
-                            if predicted_positions:
-                                cost_matrix = np.zeros(
-                                    (len(predicted_positions),
-                                     len(current_positions))
+                                head_xy, middle_xy, tail_xy = (
+                                    ensure_head_in_direction_of_accumulated_movement(
+                                        head_xy,
+                                        middle_xy,
+                                        tail_xy,
+                                        ccid,
+                                        positions_history,
+                                        orientation_fixed,
+                                        head_tail_mapping,
+                                    )
                                 )
-
-                                for i, predicted_position in enumerate(
-                                    predicted_positions
+                                angle_val = calculate_angle_between_vectors(
+                                    tail_xy, middle_xy, head_xy
+                                )
+                                prev_mid = consistentid_to_last_position[ccid]
+                                velocity = middle_xy - prev_mid
+                                consistentid_to_velocity[ccid] = velocity
+                                consistentid_to_last_position[ccid] = middle_xy
+                                consistentid_to_last_seen[ccid] = frame_count
+                                row_dict = {
+                                    "Head": head_xy,
+                                    "Middle": middle_xy,
+                                    "Tail": tail_xy,
+                                    "Angle": angle_val,
+                                }
+                                consistentid_to_last_data[ccid] = row_dict
+                                consistentid_recent_frames.setdefault(ccid, []).append(
+                                    row_dict
+                                )
+                                if (
+                                    len(consistentid_recent_frames[ccid])
+                                    > smoothing_window
                                 ):
-                                    for j, current_position in enumerate(
-                                        current_positions
-                                    ):
-                                        distance = np.linalg.norm(
-                                            current_position - predicted_position
-                                        )
-                                        cost_matrix[i, j] = distance
+                                    consistentid_recent_frames[ccid].pop(0)
 
-                                row_ind, col_ind = linear_sum_assignment(
-                                    cost_matrix)
+                                # (B-1) 直近フレームを見てスワップ案
+                                swapped_flag = False
+                                row_test_swap = swap_head_tail(row_dict)
+                                original_data = consistentid_recent_frames[ccid][
+                                    :-1
+                                ] + [row_dict]
+                                swapped_data = consistentid_recent_frames[ccid][:-1] + [
+                                    row_test_swap
+                                ]
+                                score_orig = simple_smoothness_score(original_data)
+                                score_swap = simple_smoothness_score(swapped_data)
+                                if score_swap < score_orig:
+                                    swapped_flag = True
+                                    row_dict = row_test_swap
+                                    head_xy = row_test_swap["Head"]
+                                    middle_xy = row_test_swap["Middle"]
+                                    tail_xy = row_test_swap["Tail"]
+                                    angle_val = row_test_swap["Angle"]
+                                    consistentid_to_last_data[ccid] = row_dict
+                                    consistentid_recent_frames[ccid][-1] = row_dict
 
-                                # 既存のIDを一致させる処理
-                                for i, j in zip(row_ind, col_ind):
-                                    if cost_matrix[i, j] < distance_threshold:
-                                        cid = cid_list[i]
-                                        consistent_id = cid
-                                        assigned_cids.add(cid)
-                                        assigned_indices.add(j)
-                                        consistentid_to_last_seen[consistent_id] = (
-                                            frame_count
-                                        )
-                                        consistent_ids_in_frame.add(
-                                            consistent_id)
+                                keypoints_list.append(
+                                    {
+                                        "head": head_xy,
+                                        "middle": middle_xy,
+                                        "tail": tail_xy,
+                                    }
+                                )
+                                ids_list.append(ccid)
+                                angles_list.append(angle_val)
+                                swapped_in_smoothing_flags.append(swapped_flag)
 
-                                        keypoints = current_keypoints_list[j]
-                                        head, middle, tail = (
-                                            keypoints["head"],
-                                            keypoints["middle"],
-                                            keypoints["tail"],
-                                        )
+                                csv_writer.writerow(
+                                    [
+                                        frame_count,
+                                        ccid,
+                                        head_xy[0],
+                                        head_xy[1],
+                                        middle_xy[0],
+                                        middle_xy[1],
+                                        tail_xy[0],
+                                        tail_xy[1],
+                                        angle_val,
+                                        swapped_flag,
+                                    ]
+                                )
 
-                                        # 進行方向に合わせてheadとtailを修正
-                                        head, middle, tail = (
-                                            ensure_head_in_direction_of_accumulated_movement(
-                                                head,
-                                                middle,
-                                                tail,
-                                                consistent_id,
-                                                positions_history,
-                                                orientation_fixed,
-                                                head_tail_mapping,
-                                            )
-                                        )
+                    #  2-2) 新規ID割当
+                    for i, pos in enumerate(remaining_positions):
+                        orig_idx = remaining_idx_map[i]
+                        if orig_idx not in assigned_indices:
+                            if len(available_consistent_ids) > 0:
+                                new_cid = min(available_consistent_ids)
+                                available_consistent_ids.remove(new_cid)
+                                active_consistent_ids.add(new_cid)
+                                kp = remaining_keypoints_list[i]
+                                head_xy, middle_xy, tail_xy = (
+                                    kp["head"],
+                                    kp["middle"],
+                                    kp["tail"],
+                                )
+                                head_xy, middle_xy, tail_xy = (
+                                    ensure_head_in_direction_of_accumulated_movement(
+                                        head_xy,
+                                        middle_xy,
+                                        tail_xy,
+                                        new_cid,
+                                        positions_history,
+                                        orientation_fixed,
+                                        head_tail_mapping,
+                                    )
+                                )
+                                angle_val = calculate_angle_between_vectors(
+                                    tail_xy, middle_xy, head_xy
+                                )
+                                consistentid_to_velocity[new_cid] = np.array([0, 0])
+                                consistentid_to_last_position[new_cid] = middle_xy
+                                consistentid_to_last_seen[new_cid] = frame_count
+                                new_row_dict = {
+                                    "Head": head_xy,
+                                    "Middle": middle_xy,
+                                    "Tail": tail_xy,
+                                    "Angle": angle_val,
+                                }
+                                consistentid_to_last_data[new_cid] = new_row_dict
+                                consistentid_recent_frames.setdefault(
+                                    new_cid, []
+                                ).append(new_row_dict)
+                                if (
+                                    len(consistentid_recent_frames[new_cid])
+                                    > smoothing_window
+                                ):
+                                    consistentid_recent_frames[new_cid].pop(0)
 
-                                        # 速度の更新
-                                        previous_middle = consistentid_to_last_position[
-                                            consistent_id
-                                        ]
-                                        velocity = middle - previous_middle
-                                        consistentid_to_velocity[consistent_id] = (
-                                            velocity
-                                        )
+                                keypoints_list.append(
+                                    {
+                                        "head": head_xy,
+                                        "middle": middle_xy,
+                                        "tail": tail_xy,
+                                    }
+                                )
+                                ids_list.append(new_cid)
+                                angles_list.append(angle_val)
+                                swapped_in_smoothing_flags.append(False)
 
-                                        color = id_to_color[consistent_id]
-
-                                        theta = calculate_angle_between_vectors(
-                                            tail, middle, head
-                                        )
-
-                                        angles_list.append(theta)
-                                        consistentid_to_last_keypoints[
-                                            consistent_id
-                                        ] = {
-                                            "head": head,
-                                            "middle": middle,
-                                            "tail": tail,
-                                        }
-                                        consistentid_to_last_position[consistent_id] = (
-                                            middle
-                                        )
-                                        consistentid_to_last_theta[consistent_id] = (
-                                            theta
-                                        )
-                                        keypoints_list.append(
-                                            {
-                                                "head": head,
-                                                "middle": middle,
-                                                "tail": tail,
-                                            }
-                                        )
-                                        ids_list.append(consistent_id)
-
-                                        # CSVにデータ保存
-                                        csv_writer.writerow(
-                                            [
-                                                frame_count,
-                                                consistent_id,
-                                                head[0],
-                                                head[1],
-                                                middle[0],
-                                                middle[1],
-                                                tail[0],
-                                                tail[1],
-                                                theta,
-                                            ]
-                                        )
-
-                            # 新規IDの割り当て
-                            for idx in range(len(current_positions)):
-                                if idx not in assigned_indices:
-                                    if available_consistent_ids:
-                                        consistent_id = min(
-                                            available_consistent_ids)
-                                        available_consistent_ids.remove(
-                                            consistent_id)
-                                        active_consistent_ids.add(
-                                            consistent_id)
-                                        consistentid_to_last_seen[consistent_id] = (
-                                            frame_count
-                                        )
-                                        consistent_ids_in_frame.add(
-                                            consistent_id)
-
-                                        keypoints = current_keypoints_list[idx]
-                                        head, middle, tail = (
-                                            keypoints["head"],
-                                            keypoints["middle"],
-                                            keypoints["tail"],
-                                        )
-
-                                        # 速度はゼロで初期化
-                                        consistentid_to_velocity[consistent_id] = (
-                                            np.array([0, 0])
-                                        )
-
-                                        # 位置関係でheadとtailを修正（初期フレーム）
-                                        head, middle, tail = (
-                                            ensure_head_in_direction_of_accumulated_movement(
-                                                head,
-                                                middle,
-                                                tail,
-                                                consistent_id,
-                                                positions_history,
-                                                orientation_fixed,
-                                                head_tail_mapping,
-                                            )
-                                        )
-
-                                        # 色を割り当て
-                                        color = id_to_color[consistent_id]
-
-                                        # データ更新
-                                        theta = calculate_angle_between_vectors(
-                                            tail, middle, head
-                                        )
-                                        angles_list.append(theta)
-                                        consistentid_to_last_keypoints[
-                                            consistent_id
-                                        ] = {
-                                            "head": head,
-                                            "middle": middle,
-                                            "tail": tail,
-                                        }
-                                        consistentid_to_last_position[consistent_id] = (
-                                            middle
-                                        )
-                                        consistentid_to_last_theta[consistent_id] = (
-                                            theta
-                                        )
-                                        keypoints_list.append(
-                                            {
-                                                "head": head,
-                                                "middle": middle,
-                                                "tail": tail,
-                                            }
-                                        )
-                                        ids_list.append(consistent_id)
-
-                                        # CSVに保存
-                                        csv_writer.writerow(
-                                            [
-                                                frame_count,
-                                                consistent_id,
-                                                head[0],
-                                                head[1],
-                                                middle[0],
-                                                middle[1],
-                                                tail[0],
-                                                tail[1],
-                                                theta,
-                                            ]
-                                        )
+                                csv_writer.writerow(
+                                    [
+                                        frame_count,
+                                        new_cid,
+                                        head_xy[0],
+                                        head_xy[1],
+                                        middle_xy[0],
+                                        middle_xy[1],
+                                        tail_xy[0],
+                                        tail_xy[1],
+                                        angle_val,
+                                        False,
+                                    ]
+                                )
 
                 else:
-                    print(
-                        f"フレーム {frame_count}: モデルからの結果がありませんでした。"
-                    )
+                    # ---------------------
+                    # (B) 通常のHungarian + 移動方向補正 + スムーズさスワップ
+                    # ---------------------
+                    if len(current_positions) > 0:
+                        cid_list = list(consistentid_to_last_position.keys())
+                        predicted_positions = []
+                        for ccid in cid_list:
+                            lpos = consistentid_to_last_position[ccid]
+                            vel = consistentid_to_velocity.get(ccid, np.array([0, 0]))
+                            predicted_positions.append(lpos + vel)
 
-                if keypoints_list:
+                        assigned_indices = set()
+                        assigned_cids = set()
+
+                        if len(predicted_positions) > 0:
+                            cost_matrix = np.zeros(
+                                (len(predicted_positions), len(current_positions))
+                            )
+                            for i, ppos in enumerate(predicted_positions):
+                                for j, cpos in enumerate(current_positions):
+                                    cost_matrix[i, j] = np.linalg.norm(cpos - ppos)
+                            row_ind, col_ind = linear_sum_assignment(cost_matrix)
+                            for i, j in zip(row_ind, col_ind):
+                                if cost_matrix[i, j] < distance_threshold:
+                                    ccid = cid_list[i]
+                                    assigned_indices.add(j)
+                                    assigned_cids.add(ccid)
+                                    consistentid_to_last_seen[ccid] = frame_count
+
+                                    kp = current_keypoints_list[j]
+                                    head_xy, middle_xy, tail_xy = (
+                                        kp["head"],
+                                        kp["middle"],
+                                        kp["tail"],
+                                    )
+                                    head_xy, middle_xy, tail_xy = (
+                                        ensure_head_in_direction_of_accumulated_movement(
+                                            head_xy,
+                                            middle_xy,
+                                            tail_xy,
+                                            ccid,
+                                            positions_history,
+                                            orientation_fixed,
+                                            head_tail_mapping,
+                                        )
+                                    )
+                                    angle_val = calculate_angle_between_vectors(
+                                        tail_xy, middle_xy, head_xy
+                                    )
+                                    prev_mid = consistentid_to_last_position[ccid]
+                                    velocity = middle_xy - prev_mid
+                                    consistentid_to_velocity[ccid] = velocity
+                                    consistentid_to_last_position[ccid] = middle_xy
+
+                                    row_dict = {
+                                        "Head": head_xy,
+                                        "Middle": middle_xy,
+                                        "Tail": tail_xy,
+                                        "Angle": angle_val,
+                                    }
+                                    consistentid_to_last_data[ccid] = row_dict
+                                    consistentid_recent_frames.setdefault(
+                                        ccid, []
+                                    ).append(row_dict)
+                                    if (
+                                        len(consistentid_recent_frames[ccid])
+                                        > smoothing_window
+                                    ):
+                                        consistentid_recent_frames[ccid].pop(0)
+
+                                    # 複数フレームスムーズさでスワップ判定
+                                    swapped_flag = False
+                                    row_test_swap = swap_head_tail(row_dict)
+                                    original_data = consistentid_recent_frames[ccid][
+                                        :-1
+                                    ] + [row_dict]
+                                    swapped_data = consistentid_recent_frames[ccid][
+                                        :-1
+                                    ] + [row_test_swap]
+                                    score_orig = simple_smoothness_score(original_data)
+                                    score_swap = simple_smoothness_score(swapped_data)
+                                    if score_swap < score_orig:
+                                        swapped_flag = True
+                                        row_dict = row_test_swap
+                                        head_xy = row_test_swap["Head"]
+                                        middle_xy = row_test_swap["Middle"]
+                                        tail_xy = row_test_swap["Tail"]
+                                        angle_val = row_test_swap["Angle"]
+                                        consistentid_to_last_data[ccid] = row_test_swap
+                                        consistentid_recent_frames[ccid][
+                                            -1
+                                        ] = row_test_swap
+
+                                    keypoints_list.append(
+                                        {
+                                            "head": head_xy,
+                                            "middle": middle_xy,
+                                            "tail": tail_xy,
+                                        }
+                                    )
+                                    ids_list.append(ccid)
+                                    angles_list.append(angle_val)
+                                    swapped_in_smoothing_flags.append(swapped_flag)
+
+                                    csv_writer.writerow(
+                                        [
+                                            frame_count,
+                                            ccid,
+                                            head_xy[0],
+                                            head_xy[1],
+                                            middle_xy[0],
+                                            middle_xy[1],
+                                            tail_xy[0],
+                                            tail_xy[1],
+                                            angle_val,
+                                            swapped_flag,
+                                        ]
+                                    )
+
+                        # 新規ID割り当て
+                        for j in range(len(current_positions)):
+                            if j not in assigned_indices:
+                                if len(available_consistent_ids) > 0:
+                                    new_cid = min(available_consistent_ids)
+                                    available_consistent_ids.remove(new_cid)
+                                    active_consistent_ids.add(new_cid)
+                                    kp = current_keypoints_list[j]
+                                    head_xy, middle_xy, tail_xy = (
+                                        kp["head"],
+                                        kp["middle"],
+                                        kp["tail"],
+                                    )
+                                    head_xy, middle_xy, tail_xy = (
+                                        ensure_head_in_direction_of_accumulated_movement(
+                                            head_xy,
+                                            middle_xy,
+                                            tail_xy,
+                                            new_cid,
+                                            positions_history,
+                                            orientation_fixed,
+                                            head_tail_mapping,
+                                        )
+                                    )
+                                    angle_val = calculate_angle_between_vectors(
+                                        tail_xy, middle_xy, head_xy
+                                    )
+                                    consistentid_to_velocity[new_cid] = np.array([0, 0])
+                                    consistentid_to_last_position[new_cid] = middle_xy
+                                    consistentid_to_last_seen[new_cid] = frame_count
+
+                                    row_dict = {
+                                        "Head": head_xy,
+                                        "Middle": middle_xy,
+                                        "Tail": tail_xy,
+                                        "Angle": angle_val,
+                                    }
+                                    consistentid_to_last_data[new_cid] = row_dict
+                                    consistentid_recent_frames.setdefault(
+                                        new_cid, []
+                                    ).append(row_dict)
+                                    if (
+                                        len(consistentid_recent_frames[new_cid])
+                                        > smoothing_window
+                                    ):
+                                        consistentid_recent_frames[new_cid].pop(0)
+
+                                    keypoints_list.append(
+                                        {
+                                            "head": head_xy,
+                                            "middle": middle_xy,
+                                            "tail": tail_xy,
+                                        }
+                                    )
+                                    ids_list.append(new_cid)
+                                    angles_list.append(angle_val)
+                                    swapped_in_smoothing_flags.append(False)
+
+                                    csv_writer.writerow(
+                                        [
+                                            frame_count,
+                                            new_cid,
+                                            head_xy[0],
+                                            head_xy[1],
+                                            middle_xy[0],
+                                            middle_xy[1],
+                                            tail_xy[0],
+                                            tail_xy[1],
+                                            angle_val,
+                                            False,
+                                        ]
+                                    )
+
+                # ---------------------
+                # フレーム描画 & GIF追加
+                # ---------------------
+                if len(keypoints_list) > 0:
                     try:
                         annotated_frame = annotate_frame_with_keypoints(
-                            frame,
+                            frame_org,
                             keypoints_list,
                             ids_list,
                             angles_list,
                             frame_count,
                             id_to_color,
                         )
-                        # OpenCVの画像としてGIFに追加
                         annotated_frame_rgb = cv2.cvtColor(
                             annotated_frame, cv2.COLOR_BGR2RGB
                         )
                         gif_writer.append_data(annotated_frame_rgb)
-                        print(f"フレーム {frame_count} をGIFに追加しました。")
+                        print(f"フレーム {frame_count} をGIFに追加.")
                     except Exception as e:
-                        print(f"フレーム {frame_count} の注釈中のエラー: {e}")
-                        continue
+                        print(f"フレーム {frame_count} 描画中エラー: {e}")
 
-                # 一定時間検出されていないIDの解放
-                for consistent_id in list(active_consistent_ids):
+                # ---------------------
+                # 検出されなくなったIDを解放
+                # ---------------------
+                for ccid in list(active_consistent_ids):
                     if (
-                        frame_count - consistentid_to_last_seen[consistent_id]
-                        > max_missing_frames
-                    ):
-                        active_consistent_ids.remove(consistent_id)
-                        available_consistent_ids.add(consistent_id)
-                        # データの削除（popを使用してKeyErrorを防止）
-                        consistentid_to_last_position.pop(consistent_id, None)
-                        consistentid_to_velocity.pop(consistent_id, None)
-                        consistentid_to_last_keypoints.pop(consistent_id, None)
-                        consistentid_to_last_theta.pop(consistent_id, None)
-                        # id_to_color.pop(consistent_id, None)
-                        positions_history.pop(consistent_id, None)
-                        orientation_fixed.pop(consistent_id, None)
-                        head_tail_mapping.pop(consistent_id, None)
+                        frame_count - consistentid_to_last_seen[ccid]
+                    ) > max_missing_frames:
+                        active_consistent_ids.remove(ccid)
+                        available_consistent_ids.add(ccid)
+                        consistentid_to_last_position.pop(ccid, None)
+                        consistentid_to_velocity.pop(ccid, None)
+                        consistentid_to_last_data.pop(ccid, None)
+                        positions_history.pop(ccid, None)
+                        orientation_fixed.pop(ccid, None)
+                        head_tail_mapping.pop(ccid, None)
+                        consistentid_recent_frames.pop(ccid, None)
+
                 frame_count += 1
 
-            print(
-                f"処理が完了しました。GIFは {output_gif_path} に、CSVは {output_csv_path} に保存されました。"
-            )
+            print(f"処理完了: GIF={output_gif_path}, CSV={output_csv_path}")
 
     except Exception as e:
-        print(f"CSVファイルのオープンまたは書き込み中にエラーが発生しました: {e}")
+        print(f"CSV書込エラー: {e}")
     finally:
         cap.release()
         gif_writer.close()
+
+
+def swap_head_tail(row):
+    """
+    row: {"Head":(xH,yH), "Middle":(xM,yM), "Tail":(xT,yT), "Angle":val}
+    swap後は Angle=+180度
+    """
+    swapped = {
+        "Head": row["Tail"],
+        "Middle": row["Middle"],
+        "Tail": row["Head"],
+        "Angle": (row["Angle"] + 180) % 360,
+    }
+    return swapped
 
 
 ######################################
@@ -1300,8 +1603,7 @@ def detect_avoidance_behavior_gradual(
     列は 'ID', 'Start_Frame', 'End_Frame', 'Duration'。
     """
     # 必要な列が存在するか確認
-    required_columns = ["ID", "Frame",
-                        "Middle_X", "Middle_Y", "Corrected_Angle"]
+    required_columns = ["ID", "Frame", "Middle_X", "Middle_Y", "Corrected_Angle"]
     for col in required_columns:
         if col not in data.columns:
             raise ValueError(f"必要な列 '{col}' がデータに存在しません。")
@@ -1312,8 +1614,7 @@ def detect_avoidance_behavior_gradual(
 
     for id_value in tqdm(ids, desc="Processing IDs"):
         individual_data = data[data["ID"] == id_value].copy()
-        individual_data = individual_data.sort_values(
-            by="Frame").reset_index(drop=True)
+        individual_data = individual_data.sort_values(by="Frame").reset_index(drop=True)
 
         # Corrected_Angleのスムージング（移動平均）
         window_size = 5  # スムージングのウィンドウサイズ（必要に応じて調整）
@@ -1353,8 +1654,7 @@ def detect_avoidance_behavior_gradual(
                     # 増加期間が条件を満たすか確認
                     if min_increase_frames <= increase_duration <= max_increase_frames:
                         total_angle_increase = (
-                            angles[end_increase_idx] -
-                            angles[start_increase_idx]
+                            angles[end_increase_idx] - angles[start_increase_idx]
                         )
 
                         if total_angle_increase >= angle_increase_threshold:
@@ -1364,8 +1664,7 @@ def detect_avoidance_behavior_gradual(
 
                             while plateau_end_idx < len(angles):
                                 angle_change = np.abs(
-                                    angles[plateau_end_idx] -
-                                    angles[plateau_start_idx]
+                                    angles[plateau_end_idx] - angles[plateau_start_idx]
                                 )
                                 if angle_change <= plateau_threshold:
                                     plateau_end_idx += 1
@@ -1542,8 +1841,7 @@ def create_kalman_filter(x, y):
     """
     kf = KalmanFilter(
         initial_state_mean=[x, y, 0, 0],
-        transition_matrices=[[1, 0, 1, 0], [
-            0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]],
+        transition_matrices=[[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]],
         observation_matrices=[[1, 0, 0, 0], [0, 1, 0, 0]],
         transition_covariance=0.01 * np.eye(4),
         observation_covariance=10.0 * np.eye(2),
@@ -1670,10 +1968,8 @@ def smooth_trajectory_with_flip_correction(data):
                     smoothed_y = state_means[:, 1]
             else:
                 # データポイント数が十分な場合は通常通りスプライン補間
-                smoothed_x = UnivariateSpline(
-                    frames, state_means[:, 0], s=2)(frames)
-                smoothed_y = UnivariateSpline(
-                    frames, state_means[:, 1], s=2)(frames)
+                smoothed_x = UnivariateSpline(frames, state_means[:, 0], s=2)(frames)
+                smoothed_y = UnivariateSpline(frames, state_means[:, 1], s=2)(frames)
 
             # 平滑化結果を格納
             smoothed_results[x_col] = smoothed_x
@@ -1684,18 +1980,15 @@ def smooth_trajectory_with_flip_correction(data):
             id_data[f"Smoothed_{col}"] = smoothed_results[col]
 
         # 速度計算のためのシフト列を追加
-        id_data["Prev_Smoothed_Middle_X"] = id_data["Smoothed_Middle_X"].shift(
-            1)
-        id_data["Prev_Smoothed_Middle_Y"] = id_data["Smoothed_Middle_Y"].shift(
-            1)
+        id_data["Prev_Smoothed_Middle_X"] = id_data["Smoothed_Middle_X"].shift(1)
+        id_data["Prev_Smoothed_Middle_Y"] = id_data["Smoothed_Middle_Y"].shift(1)
 
         # 速度方向に基づいて Head と Tail を修正
         def correct_flip(row):
             # 平滑化された座標を取得
             head = np.array([row["Smoothed_Head_X"], row["Smoothed_Head_Y"]])
             tail = np.array([row["Smoothed_Tail_X"], row["Smoothed_Tail_Y"]])
-            middle = np.array(
-                [row["Smoothed_Middle_X"], row["Smoothed_Middle_Y"]])
+            middle = np.array([row["Smoothed_Middle_X"], row["Smoothed_Middle_Y"]])
             prev_middle = np.array(
                 [row["Prev_Smoothed_Middle_X"], row["Prev_Smoothed_Middle_Y"]]
             )
@@ -1704,8 +1997,7 @@ def smooth_trajectory_with_flip_correction(data):
             velocity_dir = velocity / (
                 np.linalg.norm(velocity) + 1e-10
             )  # 小さい値を足してゼロ除算を防止
-            head_dir = (head - middle) / \
-                (np.linalg.norm(head - middle) + 1e-10)
+            head_dir = (head - middle) / (np.linalg.norm(head - middle) + 1e-10)
             head_dir = (head - middle) / np.linalg.norm(head - middle)
 
             # ベクトルの内積で方向を確認
@@ -1778,22 +2070,17 @@ def detect_contact_flags(data, radius=15):
 
         for i, row1 in frame_data.iterrows():
             id1 = row1["ID"]
-            head_pos1 = np.array(
-                [row1["Smoothed_Middle_X"], row1["Smoothed_Middle_Y"]])
+            head_pos1 = np.array([row1["Smoothed_Middle_X"], row1["Smoothed_Middle_Y"]])
 
             for j, row2 in frame_data.iterrows():
                 if id1 == row2["ID"]:
                     continue
                 body_positions = [
-                    np.array([row2["Smoothed_Head_X"],
-                             row2["Smoothed_Head_Y"]]),
-                    np.array([row2["Smoothed_Middle_X"],
-                             row2["Smoothed_Middle_Y"]]),
-                    np.array([row2["Smoothed_Tail_X"],
-                             row2["Smoothed_Tail_Y"]]),
+                    np.array([row2["Smoothed_Head_X"], row2["Smoothed_Head_Y"]]),
+                    np.array([row2["Smoothed_Middle_X"], row2["Smoothed_Middle_Y"]]),
+                    np.array([row2["Smoothed_Tail_X"], row2["Smoothed_Tail_Y"]]),
                 ]
-                distances = [np.linalg.norm(head_pos1 - pos)
-                             for pos in body_positions]
+                distances = [np.linalg.norm(head_pos1 - pos) for pos in body_positions]
                 if min(distances) <= radius:
                     contact_flags[i] = True
                     break
@@ -1821,8 +2108,7 @@ def judge_state(
     # ステップ1: 平滑化と Head/Tail 修正
     data_smoothed = smooth_trajectory_with_flip_correction(data)
     # ステップ2: Contact フラグを計算
-    data_smoothed["Contact"] = detect_contact_flags(
-        data_smoothed, contact_radius)
+    data_smoothed["Contact"] = detect_contact_flags(data_smoothed, contact_radius)
     # ステップ3: 結果を格納するリスト
     behaviors = []
 
@@ -1954,14 +2240,16 @@ def negative_log_likelihood(v, P_c0, P_c1_c0, P_c1_c1, data, states):
 def calculate_value_funcs(
     path, contact_radius=15, angle_threshold=35, speed_threshold=0.3, frame_interval=5
 ):
-    def flatten(x): return [
-        z
-        for y in x
-        for z in (
-            flatten(y) if hasattr(
-                y, "__iter__") and not isinstance(y, str) else (y,)
-        )
-    ]
+    def flatten(x):
+        return [
+            z
+            for y in x
+            for z in (
+                flatten(y)
+                if hasattr(y, "__iter__") and not isinstance(y, str)
+                else (y,)
+            )
+        ]
 
     df = pd.read_csv(path)
     behavior_df = judge_state(

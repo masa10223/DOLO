@@ -5,7 +5,7 @@ from functions import process_video_to_gif_with_angles
 import argparse
 import pytz
 from datetime import datetime
-
+import json
 
 def main():
     parser = argparse.ArgumentParser(
@@ -22,6 +22,8 @@ def main():
     parser.add_argument("--max_id", type=int, default=10)
     parser.add_argument("--conf", type=float, default=1e-4)
     parser.add_argument("--max_missing_frames", type=int, default=30)
+    parser.add_argument("--manual_assignments_file", type=str, default=None,
+                        help="Path to a JSON file containing manual assignments")
     arguments = parser.parse_args()
 
     video_path = arguments.video_path
@@ -31,6 +33,13 @@ def main():
     confidence = arguments.conf
     max_missing_frames = arguments.max_missing_frames
     model_path = "./runs/pose/train20241204/weights/best.pt"
+    manual_assignments = None
+    if arguments.manual_assignments_file:
+        try:
+            with open(arguments.manual_assignments_file, "r") as f:
+                manual_assignments = json.load(f)
+        except Exception as e:
+            print(f"手動割り当てファイルの読み込みに失敗: {e}")
 
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
     start = time.time()
@@ -48,6 +57,7 @@ def main():
         max_consistent_ids=max_consistent_id,
         output_csv_path=output_csv_path,
         max_missing_frames=max_missing_frames,
+        manual_assignments=manual_assignments,
     )
 
     # process_video_to_gif_with_angles_and_tracking(

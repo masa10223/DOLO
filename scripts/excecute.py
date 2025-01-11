@@ -10,7 +10,6 @@ from summarize_and_plot_contacts import (
 from summarize_and_plot_interactions import (
     summarize_initeractions_controls_and_mutants,
     select_frames,
-    selected_frames,
     distance_compute,
     plot_distance_compare,
 )

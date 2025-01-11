@@ -367,7 +367,7 @@ def detect_contact_events_with_direction(data, head_radius, max_gap):
             }
             contact_events.append(event)
 
-    contact_events_df = pd.DataFrame(contact_events)
+    contact_events_df = pd.DataFrame(contact_events, columns=['id1', 'id2', 'start_frame', 'end_frame'])
     return contact_events_df
 
 def group_consecutive_frames(frames_list, max_gap):
@@ -590,7 +590,7 @@ def summarize_initeractions_controls(control_matrix_files, head_radius=15, max_g
         contact_events_df.to_csv(
             "./csvs/interaction_matrcies/contact_events_{}.csv".format(filename)
         )
-
+        print('Saved interaction matricies of controls!')
 
 def summarize_initeractions_mutants(mutant_matrix_files, head_radius=15, max_gap=5, max_displacement=20):
     for control_path in tqdm(
@@ -616,6 +616,8 @@ def summarize_initeractions_mutants(mutant_matrix_files, head_radius=15, max_gap
         contact_events_df.to_csv(
             "./csvs/interaction_matrcies/contact_events_{}.csv".format(filename)
         )
+        
+        print('Saved interaction matricies of mutants!')
 
 
 def summarize_initeractions_controls_and_mutants(control_matrix_files, mutant_matrix_files, head_radius=15, max_gap=5, max_displacement=20):
