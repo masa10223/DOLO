@@ -1,0 +1,3 @@
+#!/bin/sh
+#nohup python3 overfitting_pipeline.py --unique_name D5-1_L5_ori > ../annotations/overfittings/logs/overfits_D1_L5_ori_manual.out ;
+nohup python3 drosophila_predict.py --video_path ../video/241227_original/D5-1_L5_ori.mov --output_gif_path ./gifs/overfit_D5-1_L5_ori.gif --output_csv_path ./csvs/trajectory/overfit_D5-1_L5_ori.csv --max_id 5 --model_path ../annotations/overfittings/overfits_weights/D5-1_L5_ori/weights/best.pt > ../annotations/overfittings/logs/precict_overfit_D5-1_L5_ori.out &
