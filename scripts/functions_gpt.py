@@ -228,21 +228,22 @@ def process_video_to_gif_with_angles(
     frame_skip=1,
     output_csv_path="./output_positions_angles.csv",
     confidence=0.01,
-    distance_threshold=50,  # 大きすぎるマッチングを big jump 扱いする基準
+    distance_threshold=50,  # gating threshold for matching
     max_missing_frames=30,
-    max_consistent_ids=5,   # 5個のIDを追跡
+    max_consistent_ids=5,   # track up to 5 IDs
     start_frame=None,
     end_frame=None,
     manual_assignments=None,
 ):
     """
-    5個のIDを追跡し、keypointsを追跡、必要に応じて manual_assignments で強制割り当て。
-    カルマンフィルタを用いてIDごとの位置を予測し、マッチングする。
+    Tracks up to 5 IDs with Kalman Filters, writes both a GIF (with keypoint annotation)
+    and a CSV (with positions/angles). Now includes improved gating & missing-frame handling.
     """
 
     if manual_assignments is None:
         manual_assignments = {}
 
+    # --- 0) Load YOLO model ---------------------------------------------------
     try:
         model = YOLO(model_path)
         print("[DEBUG] YOLOモデルをロードしました。")
@@ -250,6 +251,7 @@ def process_video_to_gif_with_angles(
         print(f"[ERROR] YOLOモデルの読み込みエラー: {e}")
         return
 
+    # --- 1) Open Video --------------------------------------------------------
     try:
         cap = cv2.VideoCapture(video_path)
         print("[DEBUG] 動画ファイルをオープンしました。")
@@ -266,20 +268,26 @@ def process_video_to_gif_with_angles(
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
     frame_count = start_frame
 
-    # ID管理構造
+    # --- 2) Data structure for multiple IDs -----------------------------------
     # tracks[cid] = {
     #   "state": [x, y, vx, vy],
     #   "cov":   P(4x4),
-    #   "missing_count": 0
+    #   "missing_count": int,
     #   "last_keypoints": {"head":..., "middle":..., "tail":...},
-    #   "last_angle": float
+    #   "last_angle": float,
+    #   ### CHANGE ###
+    #   # keep offsets so we can "predict" head & tail even if missing
+    #   "offsets": {
+    #       "head": np.array([dx_head, dy_head]),
+    #       "tail": np.array([dx_tail, dy_tail])
+    #   }
     # }
     tracks = {}
 
-    # 使用可能 ID のセット
-    available_ids = set(range(1, max_consistent_ids+1))
+    # available IDs
+    available_ids = set(range(1, max_consistent_ids + 1))
 
-    # 色のマッピング
+    # Prepare color mapping
     id_to_color = {}
     color_palette = plt.get_cmap("tab20", 10)
     for i, cid in enumerate(sorted(list(available_ids))):
@@ -287,7 +295,7 @@ def process_video_to_gif_with_angles(
         color = color_palette(color_index)[:3]
         id_to_color[cid] = color
 
-    # GIF, CSVライター
+    # --- 3) Setup GIF Writer --------------------------------------------------
     try:
         gif_writer = imageio.get_writer(output_gif_path, mode="I", fps=10, loop=0)
         print(f"[DEBUG] GIFライター初期化: {output_gif_path}")
@@ -296,6 +304,7 @@ def process_video_to_gif_with_angles(
         cap.release()
         return
 
+    # --- 4) CSV Writer --------------------------------------------------------
     try:
         with open(output_csv_path, mode="w", newline="") as csv_file:
             csv_writer = csv.writer(csv_file)
@@ -310,34 +319,43 @@ def process_video_to_gif_with_angles(
                     "Tail_X",
                     "Tail_Y",
                     "Angle",
+                    # (optionally) "Status" => "predicted"/"matched"
                 ]
             )
             print(f"[DEBUG] CSVファイルオープン: {output_csv_path}")
 
+            # ---------------- MAIN LOOP OVER FRAMES -----------------------------
             while cap.isOpened() and frame_count < end_frame:
                 ret, frame = cap.read()
                 if not ret:
                     print(f"[WARN] フレーム {frame_count}: 読み込み失敗または動画終了")
                     break
 
+                # Skip frames if needed
                 if frame_count % frame_skip != 0:
                     frame_count += 1
                     continue
 
-                #=====================================================
-                # 1) 全IDについてカルマンフィルタで予測
-                #=====================================================
+                # -------------- 4.1) Kalman predict for all existing IDs --------
                 predicted_positions = {}
                 for cid, data in tracks.items():
-                    state_pred, P_pred = predict_kf(data["state"], data["cov"], dt=1.0)
-                    tracks[cid]["state_pred"] = state_pred
-                    tracks[cid]["cov_pred"]   = P_pred
+                    # Ensure `state_pred` and `cov_pred` are initialized properly
+                    state = data.get("state")
+                    cov = data.get("cov")
+                    
+                    # Perform Kalman prediction
+                    state_pred, cov_pred = predict_kf(state, cov, dt=1.0)
+                    
+                    # Update the track with predictions
+                    tracks[cid]["state_pred"] = state_pred  # Initialize or overwrite
+                    tracks[cid]["cov_pred"] = cov_pred     # Initialize or overwrite
+                    
+                    # Store the predicted position (x, y)
                     pred_xy = get_predicted_xy(state_pred)
                     predicted_positions[cid] = pred_xy
 
-                #=====================================================
-                # 2) YOLO推論
-                #=====================================================
+
+                # -------------- 4.2) YOLO inference -----------------------------
                 try:
                     results = model(frame, conf=confidence)
                 except Exception as e:
@@ -350,62 +368,57 @@ def process_video_to_gif_with_angles(
                 if result.keypoints is not None:
                     keypoints_data = result.keypoints.data.cpu().numpy()
 
-                # YOLOから得られた middle の候補と index をまとめる
+                # gather middle points + dict of keypoints
                 current_positions = []
                 current_keypoints_dicts = []
                 if keypoints_data is not None:
                     for idx in range(keypoints_data.shape[0]):
                         kp = keypoints_data[idx]
                         if kp.shape[0] >= 3:
-                            head_xy = kp[0, :2]
+                            head_xy   = kp[0, :2]
                             middle_xy = kp[1, :2]
-                            tail_xy = kp[2, :2]
+                            tail_xy   = kp[2, :2]
                             current_positions.append(middle_xy)
                             current_keypoints_dicts.append(
                                 {"head": head_xy, "middle": middle_xy, "tail": tail_xy}
                             )
 
-                #=====================================================
-                # 3) manual_assignments の処理
-                #=====================================================
+                # -------------- 4.3) Manual Assignments -------------------------
                 frame_manual_map = manual_assignments.get(frame_count, {})
-                # {ID: index, ...}
-
                 used_det_indices = set()
                 assigned_ids = set()
 
-                # manual_assignments があれば先に割り当て
+                # If there's a forced assignment, apply it first
                 for forced_id, forced_idx in frame_manual_map.items():
                     if forced_idx < 0 or forced_idx >= len(current_keypoints_dicts):
-                        print(f"[WARN] frame={frame_count}: ID={forced_id} に対する manual index={forced_idx} が範囲外")
+                        print(f"[WARN] frame={frame_count}: manual index={forced_idx} out of range")
                         continue
-                    # もし tracks にないIDなら初期化（=新規トラック開始）
+
+                    # If the forced ID does not exist yet, create it (if available)
                     if forced_id not in tracks:
                         if forced_id in available_ids:
-                            # まだ使ってないIDなら確保してトラック作成
                             available_ids.remove(forced_id)
                             x0, y0 = current_positions[forced_idx]
                             s, P = init_kalman_filter(x0, y0)
+                            # Initialize track
                             tracks[forced_id] = {
                                 "state": s,
-                                "cov":   P,
+                                "cov": P,
                                 "missing_count": 0,
                                 "last_keypoints": {},
-                                "last_angle": 0.0
+                                "last_angle": 0.0,
+                                "offsets": {"head": np.array([0,0]), "tail": np.array([0,0])}
                             }
-                            print(f"[DEBUG] フレーム {frame_count}: manual_assignments で ID={forced_id} を新規作成")
+                            print(f"[DEBUG] フレーム {frame_count}: manual_assignments -> ID={forced_id} created")
                         else:
-                            # IDが既にどこかで使われているが missing_count で削除された？
-                            # or 5個以上追跡済み？
-                            print(f"[WARN] フレーム {frame_count}: ID={forced_id} を追加できません(上限/状況不明)")
+                            print(f"[WARN] フレーム {frame_count}: ID={forced_id} not available")
                             continue
 
                     used_det_indices.add(forced_idx)
                     assigned_ids.add(forced_id)
 
-                    # 観測を更新
+                    # KF update for forced assignment
                     obs_xy = current_positions[forced_idx]
-                    # KF update
                     state_pred = tracks[forced_id].get("state_pred", tracks[forced_id]["state"])
                     cov_pred   = tracks[forced_id].get("cov_pred",  tracks[forced_id]["cov"])
                     state_upd, cov_upd = update_kf(state_pred, cov_pred, obs_xy)
@@ -413,45 +426,35 @@ def process_video_to_gif_with_angles(
                     tracks[forced_id]["cov"]   = cov_upd
                     tracks[forced_id]["missing_count"] = 0
 
-                    # head-tail 判定
+                    # Recompute offsets and angle
                     keypoints = current_keypoints_dicts[forced_idx]
-                    head, middle, tail = (
-                        keypoints["head"],
-                        keypoints["middle"],
-                        keypoints["tail"],
-                    )
-                    head, middle, tail = ensure_head_in_direction_of_accumulated_movement(
-                        head, middle, tail
-                    )
+                    head, middle, tail = keypoints["head"], keypoints["middle"], keypoints["tail"]
+                    head, middle, tail = ensure_head_in_direction_of_accumulated_movement(head, middle, tail)
                     angle = calculate_angle_between_vectors(tail, middle, head)
 
-                    tracks[forced_id]["last_keypoints"] = {
-                        "head": head,
-                        "middle": middle,
-                        "tail": tail
+                    # Store offsets (head-middle, tail-middle)
+                    head_offset = head - middle
+                    tail_offset = tail - middle
+                    tracks[forced_id]["offsets"] = {
+                        "head": head_offset,
+                        "tail": tail_offset
                     }
+
+                    # Save data
+                    tracks[forced_id]["last_keypoints"] = {"head": head, "middle": middle, "tail": tail}
                     tracks[forced_id]["last_angle"] = angle
 
-                    # CSVへ書き込み
+                    # Write to CSV
                     csv_writer.writerow(
-                        [
-                            frame_count,
-                            forced_id,
-                            head[0], head[1],
-                            middle[0], middle[1],
-                            tail[0], tail[1],
-                            angle
-                        ]
+                        [frame_count, forced_id, head[0], head[1],
+                         middle[0], middle[1],
+                         tail[0], tail[1],
+                         angle]
                     )
+                    print(f"[DEBUG] フレーム {frame_count}: forced ID={forced_id}, index={forced_idx}")
 
-                    print(f"[DEBUG] フレーム {frame_count} の manual_assignments で ID={forced_id} に index={forced_idx} を強制割り当て")
-
-                #=====================================================
-                # 4) 残りID & 残り検出のマッチング (ハンガリアン)
-                #=====================================================
-                # まだ割り当てていないID (tracks 内にいるが assigned_ids にいない)
+                # -------------- 4.4) Matching (Hungarian) -----------------------
                 unmatched_ids = [cid for cid in tracks.keys() if cid not in assigned_ids]
-                # まだ割り当てていない YOLO index
                 unmatched_det_indices = [i for i in range(len(current_positions)) if i not in used_det_indices]
 
                 if unmatched_ids and unmatched_det_indices:
@@ -459,7 +462,6 @@ def process_video_to_gif_with_angles(
                     for i, cid in enumerate(unmatched_ids):
                         pred_xy = predicted_positions.get(cid, None)
                         if pred_xy is None:
-                            # 未初期化なはずはないが
                             pred_xy = get_predicted_xy(tracks[cid]["state"])
                         for j, det_idx in enumerate(unmatched_det_indices):
                             obs_xy = current_positions[det_idx]
@@ -468,67 +470,59 @@ def process_video_to_gif_with_angles(
 
                     row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
+                    # ### CHANGE ### gating step: only accept assignment if dist < threshold
                     for r, c in zip(row_ind, col_ind):
                         cid = unmatched_ids[r]
                         det_idx = unmatched_det_indices[c]
                         dist_val = cost_matrix[r, c]
+                        if dist_val <= distance_threshold:  # gating
+                            # KF update
+                            obs_xy = current_positions[det_idx]
+                            state_pred = tracks[cid].get("state_pred", tracks[cid]["state"])
+                            cov_pred   = tracks[cid].get("cov_pred",  tracks[cid]["cov"])
+                            state_upd, cov_upd = update_kf(state_pred, cov_pred, obs_xy)
 
-                        # big jump判定
-                        if dist_val > distance_threshold:
-                            print(f"[DEBUG] フレーム {frame_count}: ID={cid} に対してビッグジャンプ (distance={dist_val:.2f})")
+                            tracks[cid]["state"] = state_upd
+                            tracks[cid]["cov"]   = cov_upd
+                            tracks[cid]["missing_count"] = 0
 
-                        # KF update
-                        obs_xy = current_positions[det_idx]
-                        state_pred = tracks[cid].get("state_pred", tracks[cid]["state"])
-                        cov_pred   = tracks[cid].get("cov_pred",  tracks[cid]["cov"])
-                        state_upd, cov_upd = update_kf(state_pred, cov_pred, obs_xy)
+                            # head-tail
+                            keypoints = current_keypoints_dicts[det_idx]
+                            head, middle, tail = (
+                                keypoints["head"],
+                                keypoints["middle"],
+                                keypoints["tail"]
+                            )
+                            head, middle, tail = ensure_head_in_direction_of_accumulated_movement(head, middle, tail)
+                            angle = calculate_angle_between_vectors(tail, middle, head)
 
-                        tracks[cid]["state"] = state_upd
-                        tracks[cid]["cov"]   = cov_upd
-                        tracks[cid]["missing_count"] = 0
+                            # Update offsets
+                            head_offset = head - middle
+                            tail_offset = tail - middle
+                            tracks[cid]["offsets"] = {
+                                "head": head_offset,
+                                "tail": tail_offset
+                            }
 
-                        # head-tail 判定
-                        keypoints = current_keypoints_dicts[det_idx]
-                        head, middle, tail = (
-                            keypoints["head"],
-                            keypoints["middle"],
-                            keypoints["tail"],
-                        )
-                        head, middle, tail = ensure_head_in_direction_of_accumulated_movement(
-                            head, middle, tail
-                        )
-                        angle = calculate_angle_between_vectors(tail, middle, head)
+                            tracks[cid]["last_keypoints"] = {"head": head, "middle": middle, "tail": tail}
+                            tracks[cid]["last_angle"] = angle
 
-                        tracks[cid]["last_keypoints"] = {
-                            "head": head,
-                            "middle": middle,
-                            "tail": tail
-                        }
-                        tracks[cid]["last_angle"] = angle
+                            # CSV
+                            csv_writer.writerow(
+                                [frame_count, cid,
+                                 head[0], head[1],
+                                 middle[0], middle[1],
+                                 tail[0], tail[1],
+                                 angle]
+                            )
 
-                        # CSV書き込み
-                        csv_writer.writerow(
-                            [
-                                frame_count,
-                                cid,
-                                head[0],
-                                head[1],
-                                middle[0],
-                                middle[1],
-                                tail[0],
-                                tail[1],
-                                angle
-                            ]
-                        )
+                            used_det_indices.add(det_idx)
+                            assigned_ids.add(cid)
+                            print(f"[DEBUG] フレーム {frame_count}: ID={cid} <- det_idx={det_idx}, dist={dist_val:.2f}")
+                        else:
+                            print(f"[DEBUG] フレーム {frame_count}: ID={cid} skip big jump (dist={dist_val:.2f})")
 
-                        used_det_indices.add(det_idx)
-                        assigned_ids.add(cid)
-
-                        print(f"[DEBUG] フレーム {frame_count}: ID={cid} に YOLO index={det_idx} を割り当て (距離={dist_val:.2f})")
-
-                #=====================================================
-                # 5) 残った検出に対して、新規IDを割り当て
-                #=====================================================
+                # -------------- 4.5) Assign new IDs to leftover detections ------
                 leftover_det_indices = [i for i in range(len(current_positions)) if i not in used_det_indices]
                 for det_idx in leftover_det_indices:
                     if len(available_ids) > 0:
@@ -538,13 +532,14 @@ def process_video_to_gif_with_angles(
                         s, P = init_kalman_filter(obs_xy[0], obs_xy[1])
                         tracks[new_id] = {
                             "state": s,
-                            "cov":   P,
+                            "cov": P,
                             "missing_count": 0,
                             "last_keypoints": {},
-                            "last_angle": 0.0
+                            "last_angle": 0.0,
+                            "offsets": {"head": np.array([0,0]), "tail": np.array([0,0])}
                         }
 
-                        # updateステップ
+                        # immediate update
                         state_pred = s
                         cov_pred   = P
                         state_upd, cov_upd = update_kf(state_pred, cov_pred, obs_xy)
@@ -553,64 +548,80 @@ def process_video_to_gif_with_angles(
 
                         # head-tail
                         keypoints = current_keypoints_dicts[det_idx]
-                        head, middle, tail = (
-                            keypoints["head"],
-                            keypoints["middle"],
-                            keypoints["tail"],
-                        )
-                        head, middle, tail = ensure_head_in_direction_of_accumulated_movement(
-                            head, middle, tail
-                        )
+                        head, middle, tail = keypoints["head"], keypoints["middle"], keypoints["tail"]
+                        head, middle, tail = ensure_head_in_direction_of_accumulated_movement(head, middle, tail)
                         angle = calculate_angle_between_vectors(tail, middle, head)
-                        tracks[new_id]["last_keypoints"] = {
-                            "head": head,
-                            "middle": middle,
-                            "tail": tail
+
+                        head_offset = head - middle
+                        tail_offset = tail - middle
+                        tracks[new_id]["offsets"] = {
+                            "head": head_offset,
+                            "tail": tail_offset
                         }
+                        tracks[new_id]["last_keypoints"] = {"head": head, "middle": middle, "tail": tail}
                         tracks[new_id]["last_angle"] = angle
 
                         csv_writer.writerow(
-                            [
-                                frame_count,
-                                new_id,
-                                head[0],
-                                head[1],
-                                middle[0],
-                                middle[1],
-                                tail[0],
-                                tail[1],
-                                angle
-                            ]
+                            [frame_count, new_id,
+                             head[0], head[1],
+                             middle[0], middle[1],
+                             tail[0], tail[1],
+                             angle]
                         )
-
-                        print(f"[DEBUG] フレーム {frame_count}: 新規ID={new_id} を YOLO index={det_idx} に割り当て")
+                        print(f"[DEBUG] フレーム {frame_count}: NEW ID={new_id} -> det_idx={det_idx}")
                     else:
-                        # ID枠がない場合は無視
-                        pass
+                        pass  # no more IDs available
 
-                #=====================================================
-                # 6) 割り当てられなかったIDの missing_count を増やし、超えたら解放
-                #=====================================================
+                # -------------- 4.6) For IDs not assigned, write predicted row ---
                 for cid in list(tracks.keys()):
                     if cid not in assigned_ids:
+                        # Increment missing count
                         tracks[cid]["missing_count"] += 1
-                        if tracks[cid]["missing_count"] > max_missing_frames:
-                            # ID解放
-                            available_ids.add(cid)
-                            del tracks[cid]
-                            print(f"[DEBUG] フレーム {frame_count}: ID={cid} を解放 (missing_count 超過)")
+
+                        if tracks[cid]["missing_count"] <= max_missing_frames:
+                            # Use predictions if available, or fallback to the last state
+                            state_pred = tracks[cid].get("state_pred", tracks[cid]["state"])
+                            cov_pred = tracks[cid].get("cov_pred", tracks[cid]["cov"])
+                            
+                            # Update state and covariance with predictions
+                            tracks[cid]["state"] = state_pred
+                            tracks[cid]["cov"] = cov_pred
+
+                            # Get predicted middle point and reconstruct head & tail
+                            pred_middle = get_predicted_xy(state_pred)
+                            offsets = tracks[cid]["offsets"]
+                            pred_head = pred_middle + offsets["head"]
+                            pred_tail = pred_middle + offsets["tail"]
+                            old_angle = tracks[cid]["last_angle"]  # Retain the last angle
+                            
+                            # Store in tracks for visualization
+                            tracks[cid]["last_keypoints"] = {
+                                "head": pred_head,
+                                "middle": pred_middle,
+                                "tail": pred_tail,
+                            }
+                            tracks[cid]["last_angle"] = old_angle
+                            
+                            # Write predicted data to CSV
+                            csv_writer.writerow([
+                                frame_count, cid,
+                                pred_head[0], pred_head[1],
+                                pred_middle[0], pred_middle[1],
+                                pred_tail[0], pred_tail[1],
+                                old_angle
+                            ])
+
                 
-                #=====================================================
-                # 7) GIF用の可視化
-                #=====================================================
-                # フレームにいるIDだけを可視化
-                visible_ids = [cid for cid in tracks.keys() if cid in assigned_ids]
+                
+                # -------------- 4.7) Visualization for GIF ----------------------
+                # only visualize IDs that got an actual or predicted position
+                visible_ids = list(tracks.keys())
                 keypoints_list = []
                 ids_list = []
                 angles_list = []
                 for cid in visible_ids:
                     kp = tracks[cid]["last_keypoints"]
-                    if len(kp) == 3:  # head, middle, tail
+                    if "head" in kp and "middle" in kp and "tail" in kp:
                         keypoints_list.append(kp)
                         ids_list.append(cid)
                         angles_list.append(tracks[cid]["last_angle"])

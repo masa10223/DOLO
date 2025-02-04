@@ -12,12 +12,14 @@ def create_masktif(arguments):
     movie_path = f"../video/241227_original/{unique_name}.mov"
     tif_annotation_dir = f"../annotations/overfittings/tiffs/{unique_name}"
     annot_df = pd.read_csv(annotation_csv_path)
+    annot_df = annot_df.dropna()
+    #annot_df['frame_idx'] = annot_df['frame_idx'].astype(int)
     for frame_idx in (annot_df['frame_idx'].unique()):
         cap = cv2.VideoCapture(movie_path)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_idx))
         _, frame = cap.read()
         os.makedirs(tif_annotation_dir, exist_ok=True)
-        tifffile.imwrite(f"{tif_annotation_dir}/{frame_idx}.tif", frame)
+        tifffile.imwrite(f"{tif_annotation_dir}/{int(frame_idx)}.tif", frame)
 
 
 def create_yolo(arguments):
@@ -35,7 +37,7 @@ def create_yolo(arguments):
     grouped = [group for _, group in df.groupby("frame_idx")]
     # Split the groups into train and test sets
     train_groups, val_groups = train_test_split(
-        grouped, test_size=0.01, random_state=11
+        grouped, test_size=0.2 #random_state=11
     )
     # Concatenate groups back into DataFrames
     train_df = pd.concat(train_groups).reset_index(drop=True)
@@ -47,7 +49,7 @@ def create_yolo(arguments):
         tif_annotation_dir,
         train_annotations_dir,
         augment=True,
-        target_size=60,
+        target_size=300,
     )
     create_yolo_annotations_with_mask(
         val_df, movie_path, tif_annotation_dir, val_annotations_dir, augment=False
@@ -65,10 +67,14 @@ def train_overfits(arguments):
     from ultralytics import settings
     
     unique_name = arguments.unique_name
+    load_model_path = arguments.load_model_path
 
     yaml_path = f"../annotations/overfittings/yamls/{unique_name}.yaml"
     settings.update({"datasets_dir": "/cellpose/scripts"})
-    model = YOLO("./runs/pose/train/weights/best.pt")
+    if load_model_path is None:
+        model = YOLO("./runs/pose/train/weights/best.pt")
+    else:
+        model = YOLO(load_model_path)
 
     model.train(data=yaml_path, epochs=30, batch=20, device=[2, 3],
                 project = '../annotations/overfittings/overfits_weights', exist_ok=True, name = f'{unique_name}')
@@ -80,6 +86,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--unique_name", type=str)
+    parser.add_argument("--load_model_path", type=str, default=None)
     arguments = parser.parse_args()
 
     create_masktif(arguments)

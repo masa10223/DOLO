@@ -65,12 +65,11 @@ def summarize_contacts_time_controls_and_mutants(control_matrix_files, mutant_ma
 
         df = pd.read_csv(file)
         df['duration'] = df['end_frame'] - df['start_frame'] + 1
-        # 2. 個体ペアごとに duration を合計
-        contact_time_df = df.groupby(['id1', 'id2'])['duration'].sum().reset_index()
+        # 2. 個体ごとに duration を合計
+        contact_time_df = df.groupby(['id1'])['duration'].sum().reset_index()
         # 3. カラム名を変更
         contact_time_df.rename(columns={
             'id_min': 'id1',
-            'id_max': 'id2',
             'duration': 'Total_Contact_time'
         }, inplace=True)
         for _, row in contact_time_df.iterrows():
@@ -79,7 +78,6 @@ def summarize_contacts_time_controls_and_mutants(control_matrix_files, mutant_ma
                 'Group': 'control',
                 'Matrix_ID': idx,
                 'ID1': row['id1'],
-                'ID2': row['id2'],
                 'Contact_time_rate': contact_rate
             })
 
@@ -92,11 +90,10 @@ def summarize_contacts_time_controls_and_mutants(control_matrix_files, mutant_ma
         df = pd.read_csv(file)
         df['duration'] = df['end_frame'] - df['start_frame'] + 1
         # 2. 個体ペアごとに duration を合計
-        contact_time_df = df.groupby(['id1', 'id2'])['duration'].sum().reset_index()
+        contact_time_df = df.groupby(['id1'])['duration'].sum().reset_index()
         # 3. カラム名を変更
         contact_time_df.rename(columns={
             'id_min': 'id1',
-            'id_max': 'id2',
             'duration': 'Total_Contact_time'
         }, inplace=True)
         
@@ -106,7 +103,6 @@ def summarize_contacts_time_controls_and_mutants(control_matrix_files, mutant_ma
                 'Group': 'mutant',
                 'Matrix_ID': idx,
                 'ID1': row['id1'],
-                'ID2': row['id2'],
                 'Contact_time_rate': contact_rate
             })
 
@@ -117,7 +113,7 @@ def summarize_contacts_time_controls_and_mutants(control_matrix_files, mutant_ma
 
 def plot_contact_time_rate_compare(contact_time_rate_df,filename=None):
     # グループごとの平均接触率を計算
-    group_contact_rates = contact_time_rate_df.groupby(['Group', 'Matrix_ID'])['Contact_time_rate'].mean().reset_index()
+    group_contact_rates = contact_time_rate_df.groupby(['Group', 'Matrix_ID', 'ID1'])['Contact_time_rate'].mean().reset_index()
     # コントロール群と変異体群の接触率データ
     control_rates = group_contact_rates[group_contact_rates['Group'] == 'control']['Contact_time_rate']
     mutant_rates = group_contact_rates[group_contact_rates['Group'] == 'mutant']['Contact_time_rate']
@@ -149,6 +145,9 @@ def plot_contact_time_rate_compare(contact_time_rate_df,filename=None):
                 linecolor="k",
                 linewidth=2,
                 palette = 'coolwarm')
+    sns.stripplot(x='Group', y='Contact_time_rate', data=group_contact_rates, palette="coolwarm", ax=ax,
+                  edgecolor="k",
+                s = 20, linewidth=2)
     # フォントサイズやラベルの設定
     ax.set_title('Average Contact Time by Group', fontsize=20)
     ax.set_xlabel("", fontsize=20)
@@ -180,12 +179,11 @@ def summarize_contacts_count_controls_and_mutants(control_matrix_files, mutant_m
 
         df = pd.read_csv(file)
         df['duration'] = df['end_frame'] - df['start_frame'] + 1
-        # 2. 個体ペアごとに duration を合計
-        contact_time_df = df.groupby(['id1', 'id2'])['duration'].size().reset_index()
+        # 2. 個体ごとに duration を合計
+        contact_time_df = df.groupby(['id1'])['duration'].size().reset_index()
         # 3. カラム名を変更
         contact_time_df.rename(columns={
             'id_min': 'id1',
-            'id_max': 'id2',
             'duration': 'Total_Contact_counts'
         }, inplace=True)
         for _, row in contact_time_df.iterrows():
@@ -194,7 +192,6 @@ def summarize_contacts_count_controls_and_mutants(control_matrix_files, mutant_m
                 'Group': 'control',
                 'Matrix_ID': idx,
                 'ID1': row['id1'],
-                'ID2': row['id2'],
                 'Contact_count_rate': contact_rate
             })
 
@@ -207,11 +204,10 @@ def summarize_contacts_count_controls_and_mutants(control_matrix_files, mutant_m
         df = pd.read_csv(file)
         df['duration'] = df['end_frame'] - df['start_frame'] + 1
         # 2. 個体ペアごとに duration を合計
-        contact_time_df = df.groupby(['id1', 'id2'])['duration'].size().reset_index()
+        contact_time_df = df.groupby(['id1'])['duration'].size().reset_index()
         # 3. カラム名を変更
         contact_time_df.rename(columns={
             'id_min': 'id1',
-            'id_max': 'id2',
             'duration': 'Total_Contact_counts'
         }, inplace=True)
         
@@ -221,7 +217,6 @@ def summarize_contacts_count_controls_and_mutants(control_matrix_files, mutant_m
                 'Group': 'mutant',
                 'Matrix_ID': idx,
                 'ID1': row['id1'],
-                'ID2': row['id2'],
                 'Contact_count_rate': contact_rate
             })
 
@@ -232,7 +227,7 @@ def summarize_contacts_count_controls_and_mutants(control_matrix_files, mutant_m
 
 def plot_contact_count_compare(contact_count_rate_df,filename=None):
     # グループごとの平均接触率を計算
-    group_contact_rates = contact_count_rate_df.groupby(['Group', 'Matrix_ID'])['Contact_count_rate'].mean().reset_index()
+    group_contact_rates = contact_count_rate_df.groupby(['Group', 'Matrix_ID', 'ID1'])['Contact_count_rate'].mean().reset_index()
     # コントロール群と変異体群の接触率データ
     control_rates = group_contact_rates[group_contact_rates['Group'] == 'control']['Contact_count_rate']
     mutant_rates = group_contact_rates[group_contact_rates['Group'] == 'mutant']['Contact_count_rate']
@@ -270,6 +265,9 @@ def plot_contact_count_compare(contact_count_rate_df,filename=None):
                 linecolor="k",
                 linewidth=2,
                 palette = 'coolwarm')
+    sns.stripplot(x='Group', y='Contact_count_rate', data=group_contact_rates, palette="coolwarm", ax=ax,
+                  edgecolor="k",
+                s = 20, linewidth=2)
     # フォントサイズやラベルの設定
     ax.set_title('Average Contact Counts by Group', fontsize=20)
     ax.set_xlabel("", fontsize=20)
@@ -301,11 +299,10 @@ def summarize_contacts_time_per_touch_controls_and_mutants(control_matrix_files,
         df = pd.read_csv(file)
         df['duration'] = df['end_frame'] - df['start_frame'] + 1
         # 2. 個体ペアごとに duration を合計
-        contact_time_df = df.groupby(['id1', 'id2'])['duration'].mean().reset_index()
+        contact_time_df = df.groupby(['id1'])['duration'].mean().reset_index()
         # 3. カラム名を変更
         contact_time_df.rename(columns={
             'id_min': 'id1',
-            'id_max': 'id2',
             'duration': 'Total_Contact_time_per_touch'
         }, inplace=True)
         for _, row in contact_time_df.iterrows():
@@ -314,7 +311,6 @@ def summarize_contacts_time_per_touch_controls_and_mutants(control_matrix_files,
                 'Group': 'control',
                 'Matrix_ID': idx,
                 'ID1': row['id1'],
-                'ID2': row['id2'],
                 'Total_Contact_time_per_touch': contact_rate
             })
 
@@ -327,11 +323,10 @@ def summarize_contacts_time_per_touch_controls_and_mutants(control_matrix_files,
         df = pd.read_csv(file)
         df['duration'] = df['end_frame'] - df['start_frame'] + 1
         # 2. 個体ペアごとに duration を合計
-        contact_time_df = df.groupby(['id1', 'id2'])['duration'].mean().reset_index()
+        contact_time_df = df.groupby(['id1'])['duration'].mean().reset_index()
         # 3. カラム名を変更
         contact_time_df.rename(columns={
             'id_min': 'id1',
-            'id_max': 'id2',
             'duration': 'Total_Contact_time_per_touch'
         }, inplace=True)
         
@@ -341,7 +336,6 @@ def summarize_contacts_time_per_touch_controls_and_mutants(control_matrix_files,
                 'Group': 'mutant',
                 'Matrix_ID': idx,
                 'ID1': row['id1'],
-                'ID2': row['id2'],
                 'Total_Contact_time_per_touch': contact_rate
             })
 
@@ -352,7 +346,7 @@ def summarize_contacts_time_per_touch_controls_and_mutants(control_matrix_files,
 
 def plot_contact_time_per_touch_compare(contact_time_per_touch_df, filename=None):
     # グループごとの平均接触率を計算
-    group_contact_rates = contact_time_per_touch_df.groupby(['Group', 'Matrix_ID'])['Total_Contact_time_per_touch'].mean().reset_index()
+    group_contact_rates = contact_time_per_touch_df.groupby(['Group', 'Matrix_ID', 'ID1'])['Total_Contact_time_per_touch'].mean().reset_index()
     # コントロール群と変異体群の接触率データ
     control_rates = group_contact_rates[group_contact_rates['Group'] == 'control']['Total_Contact_time_per_touch']
     mutant_rates = group_contact_rates[group_contact_rates['Group'] == 'mutant']['Total_Contact_time_per_touch']
@@ -390,6 +384,10 @@ def plot_contact_time_per_touch_compare(contact_time_per_touch_df, filename=None
                 linecolor="k",
                 linewidth=2,
                 palette = 'coolwarm')
+    sns.stripplot(x='Group', y='Total_Contact_time_per_touch', 
+                  data=group_contact_rates, palette="coolwarm", ax=ax,
+                  edgecolor="k",
+                  s = 20, linewidth=2)
     # フォントサイズやラベルの設定
     ax.set_title('Average Contact Times per Touch by Group', fontsize=20)
     ax.set_xlabel("", fontsize=20)

@@ -125,15 +125,15 @@ def plot_value_funcs_controls_mutants(
             id_vars="group", var_name="contact_type", value_name="value"
         )
 
-    plt.figure(figsize=(13, 10))
+    plt.figure(figsize=(14, 10))
     grped_bplot = sns.catplot(
         x="contact_type",
         y="value",
         data=df_compare_melt,
         kind="box",
         hue="group",
-        palette="coolwarm",
-        legend=False,
+        palette="coolwarm_r",
+        #legend=False,
         height=6,
         aspect=1.3,
     )
@@ -189,7 +189,7 @@ def plot_value_funcs_controls_mutants(
     df_filtered_melt = df_filtered.melt(
         id_vars="group", var_name="contact_type", value_name="value"
     )
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(16, 6))
     sns.barplot(
         data=df_filtered_melt,
         x="value",
@@ -207,8 +207,8 @@ def plot_value_funcs_controls_mutants(
         handler,
         ["$orco^2$ , $Gr63a^1$", "$white^{1118}$"],
         fontsize=15,
-        loc="upper left",
-        bbox_to_anchor=(1.0, 1),
+        loc="upper right",
+        #bbox_to_anchor=(1.0, 1),
     )
     plt.yticks([0, 1, 2], ["Crawl", "Turn", "Pause"], fontsize=15)
     plt.ylabel("")
