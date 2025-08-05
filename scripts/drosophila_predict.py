@@ -7,6 +7,7 @@ import pytz
 from datetime import datetime
 import json
 import seaborn as sns
+import os
 
 sns.set()
 
@@ -51,6 +52,10 @@ def main():
     head_tail_jump_thresh = arguments.head_tail_jump_thresh
     overlap_thresh = arguments.overlap_thresh
     manual_assignments = None
+    
+    if not video_path or not os.path.exists(video_path):
+        raise FileNotFoundError(f"Input video file not found or path is empty: {video_path}")
+    
     if arguments.manual_assignments_file:
         try:
             with open(arguments.manual_assignments_file, "r") as f:

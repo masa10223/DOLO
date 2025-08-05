@@ -14,6 +14,7 @@ from summarize_and_plot_interactions import (
     plot_distance_compare,
     plot_rotation_events_by_files,
     plot_proximity_ratio_by_files,
+    plot_turn_after_contact
 )
 from summarize_and_plot_reinforcement_learn import (
     summarize_reinforce_learn_controls_mutants,
@@ -39,6 +40,7 @@ def main():
     parser.add_argument("--speed_threshold", type=float, default=0.3)
     parser.add_argument("--frame_interval", type=int, default=5)
     parser.add_argument("--proximity_dist", type=int, default=50)
+    parser.add_argument("--reaction_frame", type=int, default=50)
     arguments = parser.parse_args()
 
     Thr_frame = arguments.thr_frame
@@ -49,6 +51,7 @@ def main():
     speed_threshold = arguments.speed_threshold
     frame_interval = arguments.frame_interval
     proximity_dist = arguments.proximity_dist
+    reaction_frame = arguments.reaction_frame
     date = datetime.now(pytz.timezone("Asia/Tokyo")).strftime("%Y%m%d")
 
     filename = f"{date}_thrframe{Thr_frame}_radius{Head_radius}_maxgap{max_gap}_maxdisplacement{max_displacement}_anglethr{angle_threshold}_speedthr{speed_threshold}_frameinterval{frame_interval}_proximitydist{proximity_dist}"
@@ -88,16 +91,23 @@ def main():
     )
     plot_distance_compare(results_combine, results_df, results_df_d, filename=filename)
     
-    plot_rotation_events_by_files(control_matrix_files, mutant_matrix_files,
+    _, _ = plot_rotation_events_by_files(control_matrix_files, mutant_matrix_files,
                                   min_event_length=15, 
                                   curvature_threshold=2.5,
                                   local_window=0, 
                                   max_gap=max_gap, 
-                                  max_displacement=max_displacement, filename=filename)
+                                  max_displacement=max_displacement, 
+                                  filename=filename)
     
     plot_proximity_ratio_by_files(control_matrix_files, mutant_matrix_files,
                                   distance_threshold=proximity_dist, 
                                   filename = filename)
+    
+    plot_turn_after_contact(control_matrix_files, mutant_matrix_files, 
+                            threshold=reaction_frame, 
+                            target="id1", 
+                            thr_frame = Thr_frame, 
+                            filename = filename)
     ## Contactの確認
     start_now = datetime.now(pytz.timezone("Asia/Tokyo"))
     print(

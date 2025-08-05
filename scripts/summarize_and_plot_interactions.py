@@ -20,6 +20,7 @@ import matplotlib.ticker as ptick
 from scipy.spatial import distance_matrix
 from scipy.stats import mannwhitneyu
 
+
 import matplotlib
 # フォントの設定を Arial に変更
 matplotlib.rcParams['font.family'] = 'Arial'
@@ -970,24 +971,28 @@ def compute_rotation_file_summary(file_list, rotation_events_df):
         # 総フレーム数はFrameカラムの最大値＋1（フレーム番号が0始まりの場合）
         total_frames = df['Frame'].max() + 1
         file_name = os.path.basename(f)
+        ## IDごとに集計 (2025/2/4 Update)
+        for ids in range(1,6):
         # rotation_events_df に同一ファイル名のイベントを抽出
-        events_for_file = rotation_events_df[rotation_events_df['File'] == file_name]
-        event_count = len(events_for_file)
-        ratio = event_count / total_frames if total_frames > 0 else np.nan
-        # グループはファイル名の先頭文字で判定（例：'C'→Control, 'D'→Mutant）
-        if file_name.startswith('C'):
-            group = 'Control'
-        elif file_name.startswith('D'):
-            group = 'Mutant'
-        else:
-            group = 'Unknown'
-        summary_list.append({
-            'File': file_name,
-            'Group': group,
-            'total_frames': total_frames,
-            'event_count': event_count,
-            'ratio': ratio
-        })
+            events_for_file = rotation_events_df[(rotation_events_df['File'] == file_name)
+            & (rotation_events_df['ID'] ==ids)]
+            event_count = len(events_for_file)
+            ratio = event_count / total_frames if total_frames > 0 else np.nan
+            # グループはファイル名の先頭文字で判定（例：'C'→Control, 'D'→Mutant）
+            if file_name.startswith('C'):
+                group = 'Control'
+            elif file_name.startswith('D'):
+                group = 'Mutant'
+            else:
+                group = 'Unknown'
+            summary_list.append({
+                'File': file_name,
+                'Group': group,
+                'total_frames': total_frames,
+                'event_count': event_count,
+                'id': ids,
+                'ratio': ratio
+            })
     return pd.DataFrame(summary_list)
 
 # =============================================================================
@@ -1163,13 +1168,12 @@ def plot_rotation_events_by_files(control_matrix_files, mutant_matrix_files,
     else:
         all_rotation_events_df = pd.DataFrame()
 
-    print("全ファイルの回転イベント:")
-    print(all_rotation_events_df)
-
     all_files = control_matrix_files + mutant_matrix_files
     rotation_file_summary_df = compute_rotation_file_summary(all_files, all_rotation_events_df)
 
     plot_rotation_events_file_summary(rotation_file_summary_df, filename=filename)
+    
+    return all_rotation_events_df, rotation_file_summary_df
     
     
 def compute_proximity_ratio(df, threshold, id_col="ID", frame_col="Frame", x_col="Head_X", y_col="Head_Y"):
@@ -1236,6 +1240,143 @@ def plot_proximity_ratio_by_files(control_matrix_files, mutant_matrix_files,
     add_stat_annotation(ax, 0, 1, y_max + h_offset, p_val, h_offset)
     plt.savefig(f"./Fig_paper/{filename}/proximity_ratio_distribution_{filename}.pdf")
 
+# =============================================================================
+# 【プロット関数：Contact + Turn】
+# =============================================================================
+
+def select_frames_of_contact_events(thr_frame = 5000): 
+    control_matrix_files = []
+    for path in natsorted(glob.glob('./csvs/interaction_matrcies/contact_events_C*')):
+        df = pd.read_csv(path)
+        ## 最大フレームの取得
+        filename = (os.path.splitext(os.path.basename(path))[0][15:])
+        tmp_df = pd.read_csv('./csvs/trajectory/{}.csv'.format(filename))
+        total_frames = tmp_df['Frame'].max() + 1
+        if total_frames > thr_frame:
+            print(path)
+            control_matrix_files.append(path)
+
+    mutant_matrix_files = []
+    for path in natsorted(glob.glob('./csvs/interaction_matrcies/contact_events_D*')):
+        df = pd.read_csv(path)
+        ## 最大フレームの取得
+        filename = (os.path.splitext(os.path.basename(path))[0][15:])
+        tmp_df = pd.read_csv('./csvs/trajectory/{}.csv'.format(filename))
+        total_frames = tmp_df['Frame'].max() + 1
+        if total_frames > thr_frame:
+            print(path)
+            mutant_matrix_files.append(path)
+            
+    return control_matrix_files, mutant_matrix_files
+
+def collect_contact_files(thr_frame = 5000):
+    contact_control_matrix_files, contact_mutant_matrix_files = select_frames_of_contact_events(thr_frame = thr_frame)
+    all_contact_events_df = pd.DataFrame()
+    for path in contact_control_matrix_files:
+        df = pd.read_csv(path)
+        df['File'] = os.path.basename(path)
+        df['Group'] = 'Control'
+        all_contact_events_df = pd.concat([all_contact_events_df,df])
+
+    for path in contact_mutant_matrix_files:
+        df = pd.read_csv(path)
+        df['File'] = os.path.basename(path)
+        df['Group'] = 'Mutant'
+        all_contact_events_df = pd.concat([all_contact_events_df,df])
+        
+    return all_contact_events_df.reset_index(drop=True)
+
+
+def check_turn_after_contact(contact_df, turn_df, threshold=30, target="id1"):
+    """
+    接触イベントの各行について、指定された個体（target列の値）が、
+    同じファイル内で、接触終了後 threshold フレーム以内にTurnイベントを起こすかを判定する。
+    
+    Parameters:
+      contact_df: 接触イベントのDataFrame。必須カラム: 'id1', 'id2', 'start_frame', 'end_frame', 'File'
+      turn_df: TurnイベントのDataFrame。必須カラム: 'ID', 'start_frame', 'end_frame', 'duration', 'event_frames', 'Group', 'File'
+      threshold: 接触終了後、何フレーム以内にTurnイベントが開始すれば「追跡」とみなすかの閾値（例: 30）
+      target: 接触イベント中、どちらの個体を対象にTurnの有無をチェックするか（例: "id1" または "id2"）
+    
+    Returns:
+      contact_df: 各接触イベントに対して、新たに以下のカラムを追加したDataFrame  
+          - "turn_within_threshold": True/False  
+          - "turn_start_frame": 該当するTurnイベントの開始フレーム（該当しない場合はNaN）
+    """
+    # DataFrameのコピーを作成
+    contact_df = contact_df.copy()
+    
+    # 新たなカラムを初期化
+    contact_df["turn_within_threshold"] = False
+    contact_df["turn_start_frame"] = pd.NA
+    
+    # 各接触イベント行ごとにチェック
+    for idx, row in contact_df.iterrows():
+        file_name = row["File"][15:]
+        contact_end = row["end_frame"]
+        target_id = row[target]
+        
+        # turn_dfから、同じファイルかつ対象個体のTurnイベントを抽出
+        df_turn = turn_df[(turn_df["File"] == file_name) & (turn_df["ID"] == target_id)]
+        # 接触終了後、かつ threshold フレーム以内に開始するTurnイベントを抽出
+        df_turn_within = df_turn[(df_turn["start_frame"] > contact_end) & 
+                                  (df_turn["start_frame"] <= contact_end + threshold)]
+        if not df_turn_within.empty:
+            # 最初のTurnイベントのstart_frameを取得（昇順ソートして）
+            first_turn_start = df_turn_within["start_frame"].min()
+            contact_df.at[idx, "turn_within_threshold"] = True
+            contact_df.at[idx, "turn_start_frame"] = first_turn_start
+        else:
+            contact_df.at[idx, "turn_within_threshold"] = False
+            contact_df.at[idx, "turn_start_frame"] = pd.NA
+    return contact_df
+
+def aggregate_turn_events(df_sub, target):
+    """
+    make_sub_event_rows() で作成した DataFrame (File, Group, ID, turn_within_threshold) から、
+    個体ごとに合計接触イベント数(total_events) と Turn イベント数(turn_events)をカウントし、
+    turn_ratio を算出する。
+    """
+    agg = df_sub.groupby(['File','Group',target]).agg(
+        total_events = (target, 'count'),
+        turn_events = ('turn_within_threshold', lambda x: x.sum())
+    ).reset_index()
+    agg['turn_ratio'] = agg['turn_events'] / agg['total_events']
+    return agg
+
+
+def plot_turn_after_contact(control_matrix_files, mutant_matrix_files, threshold=30, target="id1", thr_frame = 5000, filename = None):
+    contact_df = collect_contact_files(thr_frame = thr_frame)
+    turn_df, _ = plot_rotation_events_by_files(control_matrix_files, mutant_matrix_files, filename=filename)
+    
+    contact_df = check_turn_after_contact(contact_df, turn_df, threshold=threshold, target=target)
+    final_agg = aggregate_turn_events(contact_df, target)
+    
+    control_values = final_agg[final_agg['Group']=='Control']['turn_ratio'].dropna().values
+    mutant_values  = final_agg[final_agg['Group']=='Mutant']['turn_ratio'].dropna().values
+    
+    stat, p_val = mannwhitneyu(control_values, mutant_values, alternative='two-sided')
+    print("Mann–Whitney U test p-value:", p_val)
+    
+    fig, ax = plt.subplots(figsize=(10,6))
+    sns.boxplot(x='Group', y='turn_ratio', data=final_agg, palette='coolwarm', ax=ax,
+                linecolor="k",
+                linewidth=2,)
+    sns.stripplot(x='Group', y='turn_ratio', data=final_agg, palette='coolwarm', ax=ax,
+                  edgecolor='k', s=20, linewidth=2)
+    ax.set_title(f"Turn After Contact Ratio, threshold={threshold}", fontsize=16)
+    ax.set_xlabel("", fontsize=16)
+    ax.set_ylabel("Turn Ratio", fontsize=14)
+    # example of custom x-ticks
+    labels = ['$\mathit{white^{1118}}$', '$\mathit{orco^2}$ , $\mathit{Gr63a^1}$']
+    ax.set_xticklabels(labels, fontsize=14)
+    
+    y_max = final_agg['turn_ratio'].max()
+    y_min = final_agg['turn_ratio'].min()
+    h_offset = (y_max - y_min)*0.1
+    add_stat_annotation(ax, 0, 1, y_max + h_offset, p_val, h_offset)
+    plt.savefig(f'./Fig_paper/{filename}/turn_after_contact_ratio_{filename}.pdf')
+
                                     
 
 
@@ -1257,6 +1398,6 @@ if __name__ == "__main__":
     )
     plot_distance_compare(results_combine, results_df, results_df_d)
     
-    plot_rotation_events_by_files(control_matrix_files, mutant_matrix_files,
+    _,_ = plot_rotation_events_by_files(control_matrix_files, mutant_matrix_files,
                                   min_event_length=15, curvature_threshold=2.5,
                                   local_window=0, max_gap=1, max_displacement=20)

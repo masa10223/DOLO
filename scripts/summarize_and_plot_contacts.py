@@ -407,6 +407,8 @@ def plot_contact_time_per_touch_compare(contact_time_per_touch_df, filename=None
     plt.savefig(f'./Fig_paper/{filename}/contact_time_per_touch_compare_{filename}.pdf')
 
 
+    
+
 if __name__ == "__main__":
     import matplotlib
     # フォントの設定を Arial に変更
