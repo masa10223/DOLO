@@ -260,11 +260,15 @@ def create_yolo_annotations_from_images(
             [
                 iaa.Fliplr(0.5),  # Horizontal flip 50% of the time
                 iaa.Affine(
-                    rotate=(-25, 25)
-                ),  # Random rotation between -25 and 25 degrees
-                iaa.Affine(translate_px={"x": (-30, 30), "y": (-20, 20)}),
-                iaa.ScaleX((0.95, 1.05)),  # Random scaling along X-axis
-                iaa.ScaleY((0.95, 1.05)),  # Random scaling along Y-axis
+                    translate_percent={"x": (-0.0625, 0.0625), "y": (-0.0625, 0.0625)}
+                ),
+                iaa.Affine(rotate=(-25, 25)),
+                iaa.Affine(scale={"x": (0.9, 1.1), "y": (0.9, 1.1)}),
+                iaa.AdditiveGaussianNoise(scale=(0, 0.05 * 255)),
+                iaa.AdditivePoissonNoise(lam=(0, 30)),
+                iaa.Multiply((0.9, 1.1)),
+                iaa.LinearContrast((0.8, 1.2)),
+                iaa.Dropout(p=(0, 0.01)),
             ]
         )
         if augment
@@ -289,9 +293,9 @@ def create_yolo_annotations_from_images(
         # Save the original image and annotation
         save_frame_and_annotation(image, group, annotations_dir, frame_idx, 0)
 
-        # Apply augmentation if enabled and target size not reached
+        # Apply augmentation if enabled: fill up to target_size images (same logic as create_yolo_annotations_with_mask)
         if augment:
-            current_count = len(group)
+            current_count = 0
             while current_count < target_size:
                 aug_image, aug_group = apply_augmentation(image, group, aug_seq)
                 save_frame_and_annotation(
@@ -302,7 +306,7 @@ def create_yolo_annotations_from_images(
                     current_count,
                     augmented=True,
                 )
-                current_count += len(aug_group)
+                current_count += 1
 
 
 def save_frame_and_annotation(

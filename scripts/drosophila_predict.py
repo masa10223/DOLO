@@ -25,9 +25,9 @@ def main():
         default="./runs/pose/train/weights/best.pt",
     )
     parser.add_argument("--max_id", type=int, default=10)
-    parser.add_argument("--conf", type=float, default=1e-4)
+    parser.add_argument("--conf", type=float, default=1e-3)
     parser.add_argument("--iou_thr", type=float, default=0.45)
-    parser.add_argument("--max_missing_frames", type=int, default=30)
+    parser.add_argument("--max_missing_frames", type=int, default=15)
     parser.add_argument("--manual_assignments_file", type=str, default=None,
                         help="Path to a JSON file containing manual assignments")
     parser.add_argument("--start_frame", type=int, default=None)
@@ -104,7 +104,7 @@ def main():
         end_frame=end_frame,
         max_age=max_missing_frames,
         max_ids=max_consistent_id,   
-        n_init=5, ## how many frames to detect trajectories
+        n_init=2, ## how many frames to detect trajectories
         dist_thresh=dist_thresh,
         head_tail_jump_thresh=head_tail_jump_thresh,  ### NEW param
         overlap_thresh=overlap_thresh           ## how close (head, middle, tail) can be before we consider them “identical.”

@@ -11,7 +11,7 @@ def create_masktif(arguments):
     annotation_csv_path = (
         f"../annotations/overfittings/csvs/annotation_{unique_name}_manual.csv"
     )
-    movie_path = f"../video/250703_melano/{unique_name}.avi"
+    movie_path = f"../video/whi-DM/{unique_name}.avi"
     tif_annotation_dir = f"../annotations/overfittings/tiffs/{unique_name}"
     annot_df = pd.read_csv(annotation_csv_path)
     annot_df = annot_df.dropna()
@@ -29,7 +29,7 @@ def create_yolo(arguments):
     annotation_csv_path = (
         f"../annotations/overfittings/csvs/annotation_{unique_name}_manual.csv"
     )
-    movie_path = f"../video/250703_melano/{unique_name}.avi"
+    movie_path = f"../video/whi-DM/{unique_name}.avi"
     tif_annotation_dir = f"../annotations/overfittings/tiffs/{unique_name}"
     train_annotations_dir = (
         f"../annotations/overfittings/train_annotations/{unique_name}"
@@ -44,8 +44,10 @@ def create_yolo(arguments):
     # Split the groups into train and test sets
     # split 0.1 for validation (2025/08/04 fixed)
     # split 0.01 for validation (2025/08/05 fixed)
+    # split 0.2 for validation (2025/09/23 fixed)
+    # split 0.05 for validation (2025/10/20 fixed)
     train_groups, val_groups = train_test_split(
-        grouped, test_size=0.01  # random_state=11
+        grouped, test_size=0.05  # random_state=11
     )
     # Concatenate groups back into DataFrames
     train_df = pd.concat(train_groups).reset_index(drop=True)
@@ -57,7 +59,7 @@ def create_yolo(arguments):
         tif_annotation_dir,
         train_annotations_dir,
         augment=True,
-        target_size=100,
+        target_size=360,
     )
     create_yolo_annotations_with_mask(
         val_df, movie_path, tif_annotation_dir, val_annotations_dir, augment=False
@@ -88,7 +90,7 @@ def train_overfits(arguments):
 
     model.train(
         data=yaml_path,
-        epochs=15,
+        epochs=20,
         batch=20,
         device=[int(gpu1), int(gpu2)],
         project="../annotations/overfittings/overfits_weights",
@@ -108,8 +110,8 @@ def main():
     parser.add_argument("--gpu2", type=int)
     arguments = parser.parse_args()
 
-    create_masktif(arguments)
-    create_yolo(arguments)
+    #create_masktif(arguments)
+    #create_yolo(arguments)
     train_overfits(arguments)
 
 

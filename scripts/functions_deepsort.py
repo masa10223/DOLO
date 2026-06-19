@@ -53,6 +53,43 @@ def calculate_angle_between_vectors(tail, middle, head):
     return np.degrees(theta)
 
 
+
+def annotate_frame_with_keypoints_and_angle(frame, keypoints_list, ids_list, angles_list, frame_idx, id_to_color):
+    """フレームにキーポイントとIDを描画"""
+    annotated = frame.copy()
+    
+    for kpts, track_id, angle in zip(keypoints_list, ids_list, angles_list):
+        head = kpts["head"].astype(int)
+        middle = kpts["middle"].astype(int)
+        tail = kpts["tail"].astype(int)
+        
+        # 色を取得
+        color = id_to_color.get(track_id, (0, 255, 0))
+        color = tuple(int(c * 255) for c in color)
+        
+        # キーポイントを描画
+        cv2.circle(annotated, tuple(head), 5, color, -1)
+        cv2.circle(annotated, tuple(middle), 5, color, -1)
+        cv2.circle(annotated, tuple(tail), 5, color, -1)
+        
+        # 線を描画
+        cv2.line(annotated, tuple(tail), tuple(middle), color, 2)
+        cv2.line(annotated, tuple(middle), tuple(head), color, 2)
+        
+        # IDと角度を表示
+        cv2.putText(annotated, f"ID:{track_id}", tuple(middle - 10), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        cv2.putText(annotated, f"{angle:.1f}°", tuple(middle + [0, 20]), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+    
+    # フレーム番号を表示
+    cv2.putText(annotated, f"Frame: {frame_idx}", (10, 30), 
+               cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    
+    return annotated
+
+
+
 def annotate_frame_with_keypoints(img, keypoints_list, ids_list, angles_list, frame_number, id_to_color):
     """
     Annotate the frame with keypoints and IDs.
@@ -458,40 +495,6 @@ def calculate_angle_between_vectors(tail, middle, head):
     angle = np.arctan2(cross_product, dot_product)
     return np.degrees(angle)
 
-
-def annotate_frame_with_keypoints(frame, keypoints_list, ids_list, angles_list, frame_idx, id_to_color):
-    """フレームにキーポイントとIDを描画"""
-    annotated = frame.copy()
-    
-    for kpts, track_id, angle in zip(keypoints_list, ids_list, angles_list):
-        head = kpts["head"].astype(int)
-        middle = kpts["middle"].astype(int)
-        tail = kpts["tail"].astype(int)
-        
-        # 色を取得
-        color = id_to_color.get(track_id, (0, 255, 0))
-        color = tuple(int(c * 255) for c in color)
-        
-        # キーポイントを描画
-        cv2.circle(annotated, tuple(head), 5, color, -1)
-        cv2.circle(annotated, tuple(middle), 5, color, -1)
-        cv2.circle(annotated, tuple(tail), 5, color, -1)
-        
-        # 線を描画
-        cv2.line(annotated, tuple(tail), tuple(middle), color, 2)
-        cv2.line(annotated, tuple(middle), tuple(head), color, 2)
-        
-        # IDと角度を表示
-        cv2.putText(annotated, f"ID:{track_id}", tuple(middle - 10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        cv2.putText(annotated, f"{angle:.1f}°", tuple(middle + [0, 20]), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
-    
-    # フレーム番号を表示
-    cv2.putText(annotated, f"Frame: {frame_idx}", (10, 30), 
-               cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    
-    return annotated
 
 
 def process_video_to_gif_with_angles(
