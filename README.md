@@ -9,7 +9,6 @@ DOLO combines [Ultralytics YOLO Pose](https://docs.ultralytics.com/tasks/pose/) 
 ## Features
 
 - **Manual pose annotation** — CSV-based labels with head / mid / tail keypoints per fly and frame
-- **Per-video overfitting** — Train a dedicated YOLO Pose model for each recording (high accuracy on a single arena)
 - **Foundation model training** — Merge all annotated videos, split by video ID (hold-out validation), augment from TIFF frames, and train one shared model
 - **Video inference & tracking** — YOLO Pose + DeepSORT-style ID assignment; output GIF, MOV, and trajectory CSV
 - **Behavior analysis** — Scripts to summarize contacts, interactions, and reinforcement-learning experiments
