@@ -1,3 +1,27 @@
+# --- モデル重み（大きいので git に入れない）---
+*.pt
+*.onnx
+*.engine
+
+# --- Python パッケージング / テスト ---
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.dolo/
+
+# --- テスト用の大きな成果物（tests/data/README.md 参照）---
+tests/data/*.pt
+tests/data/*.avi
+tests/data/*.mp4
+tests/data/*.mov
+
 scripts/val_annotations*
 scripts/train_annotations*
 scripts/val_annotations

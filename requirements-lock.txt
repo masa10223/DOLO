@@ -1,0 +1,7 @@
+# このファイルは requirements/ ディレクトリへ移動しました。
+#
+#   requirements/lock-linux.txt   GPU サーバー用（CUDA, torch 2.0.0）
+#   requirements/lock-macos.txt   Mac 用（MPS, torch 2.2.2）
+#   requirements/core.in          torch 不要のコア依存
+#
+# 手順は docs/ENVIRONMENT.md を参照。

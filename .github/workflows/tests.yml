@@ -1,0 +1,61 @@
+name: tests
+
+on:
+  push:
+    branches: [main, dev, "feature/**"]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  # torch を入れずにコアのテストを回す。数十秒で終わるので、
+  # リファクタ中の安全網として毎コミット回す想定。
+  unit:
+    name: ユニットテスト (torch 不要)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: uv をセットアップ
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: 依存をインストール
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install -r requirements/core.in
+          uv pip install pytest pytest-cov
+          uv pip install --no-deps -e .
+
+      - name: テスト
+        run: uv run pytest tests/ -q --tb=short
+
+      - name: import が軽いことを確認
+        # dolo のトップレベルが torch/opencv を引き込んでいないことの回帰防止。
+        # ここが重くなると GUI の起動が目に見えて遅くなる。
+        run: |
+          uv run python -c "
+          import sys
+          import dolo
+          heavy = {'torch', 'ultralytics', 'cv2', 'matplotlib'}
+          loaded = heavy & set(sys.modules)
+          assert not loaded, f'import dolo が重い依存を読み込んでいます: {loaded}'
+          print('OK: import dolo は軽量')
+          "
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv tool run ruff check dolo/ tests/ tools/
+      - run: uv tool run ruff format --check dolo/ tests/ tools/

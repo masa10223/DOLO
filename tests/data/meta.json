@@ -1,0 +1,17 @@
+{
+  "max_id": 6,
+  "conf": 0.001,
+  "iou_thr": 0.45,
+  "max_missing_frames": 15,
+  "dist_thresh": 30,
+  "head_tail_jump_thresh": 50,
+  "overlap_thresh": 5,
+  "start_frame": 0,
+  "end_frame": 150,
+  "device": "auto",
+  "golden_torch_versions": ["2.0.0", "2.2.2"],
+  "golden_ultralytics_version": "8.4.19",
+  "video": "sample.mov",
+  "model": "model.pt",
+  "_note": "パラメータは CSV から推定した値。E2E テストが落ちたらここを実行時の値に直す。"
+}

@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+.dolo
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+*.pt
+*.onnx
+*.engine
+annotations
+video
+scripts/csvs_old
+scripts/runs
+test_movie.mov
+test_movie.csv
