@@ -1,0 +1,11 @@
+# DOLO コア依存（torch 不要。ユニットテストはここまでで動く）
+numpy==1.26.4
+pandas==2.2.2
+scipy==1.13.1
+opencv-python==4.9.0.80
+imageio==2.34.1
+imageio-ffmpeg==0.6.0
+matplotlib==3.9.0
+pyyaml>=6.0
+tqdm>=4.65
+natsort==8.4.0
