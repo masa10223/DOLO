@@ -123,6 +123,7 @@ def test_golden_angle_is_in_signed_range():
 
 
 @pytest.mark.skipif(not GOLDEN.exists(), reason="ゴールデンCSV未作成")
+@pytest.mark.skipif(not VIDEO.exists(), reason="サンプル動画未配置（tests/data/README.md 参照）")
 def test_golden_coordinates_are_inside_the_frame():
     pytest.importorskip("cv2")
     import cv2
@@ -131,6 +132,8 @@ def test_golden_coordinates_are_inside_the_frame():
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     cap.release()
+    if width <= 0 or height <= 0:
+        pytest.skip(f"動画サイズを読めません: {VIDEO} ({width}x{height})")
 
     df = pd.read_csv(GOLDEN)
     for axis, limit in (("X", width), ("Y", height)):
