@@ -45,16 +45,24 @@ Large artifacts (videos, annotations, model weights, caches) are excluded via `.
 `*.pt` / `*.onnx` / `*.engine` are gitignored. GitHub rejects files over **100 MB**, and the default
 checkpoint (`best.pt`, ~120 MB) cannot be pushed as a normal Git blob.
 
+**Download the default assets from Zenodo:**
+
+- DOI: [10.5281/zenodo.21951363](https://doi.org/10.5281/zenodo.21951363)
+- Files: `best.pt` (default model weights) and `test_movie.mov` (demo / test video)
+
+After download, place `best.pt` at the repository root (or under `models/default.pt`, or set
+`DOLO_MODEL_PATH`). Keep `test_movie.mov` anywhere convenient for local GUI / CLI trials — it is not
+required for unit tests in CI.
+
 Recommended workflow:
 
 1. Keep weights **out of commits** (do not `git add -f best.pt`).
 2. Place a local default at repo root `best.pt`, or `models/default.pt`, or set `DOLO_MODEL_PATH`.
-3. When you want to share a public default model, publish it outside the Git tree — for example a
-   [GitHub Release](https://docs.github.com/en/repositories/releasing-projects-on-github) asset,
-   Zenodo, or Hugging Face — and document the download URL (and SHA-256 when available).
+3. Prefer the Zenodo deposit above as the citable source; optionally mirror the same files on a
+   [GitHub Release](https://docs.github.com/en/repositories/releasing-projects-on-github) for convenience.
 
 Git LFS can store large files in theory, but free quotas are easy to exhaust for ~100 MB+ models;
-Release assets or research archives are usually a better fit for scientific checkpoints.
+Zenodo (or Release assets) is a better fit for scientific checkpoints.
 
 ---
 
