@@ -1,66 +1,70 @@
+[**English**](README.md) | [日本語](README.ja.md)
+
 # DOLO
 
-**D**rosophila tracking with **YOLO** **P**ose — *Drosophila* 動画から姿勢推定・個体追跡・行動解析を行うソフトウェアです。
+**D**rosophila tracking with **YOLO** **P**ose — software for pose estimation, multi-fly tracking, and behavioral analysis in *Drosophila* videos.
 
-ブラウザ上の GUI で動画を選び、学習済みモデルで追跡し、軌跡 CSV / アノテーション付き動画などを出力できます。  
-この README は、**ターミナルや Git に慣れていない方**でも一通り動かせるように書いています。
+Use the browser GUI to pick a video, run a trained model, and export trajectory CSVs / annotated videos.  
+This README is written so people who are **new to the terminal and Git** can get a first run working.
 
-関連論文（投稿中）:
+Associated manuscript (submitted):
 
 > **Chemosensory input suppresses cannibalism by stabilizing social feeding boundaries in Drosophila larvae**  
 > Nagisa Matsuda-Watanabe, Masato Tsutsumi, Misako Okumura, and Takahiro Chihara
 
----
-
-## いまからやること（全体像）
-
-1. パソコンに **Git** と **uv**（Python の入れやすい道具）を入れる  
-2. GitHub から DOLO のプログラムを **`git clone`** する  
-3. Zenodo から **`best.pt`（重み）** と **`test_movie.mov`（試し用動画）** をダウンロードする  
-4. ダウンロードしたファイルを、clone したフォルダの決まった場所に置く  
-5. 依存パッケージを入れて、**`dolo gui`** でブラウザを開く  
-
-所要時間の目安: 初回 15–40 分（ネット速度と PC 性能による）。  
-`best.pt` は約 **120 MB** あります。
-
-対応 OS: **macOS** または **Linux**（Windows は未整備。WSL2 利用は自己責任で）。
+Japanese lab members: see **[README.ja.md](README.ja.md)** for the same guide in Japanese.
 
 ---
 
-## 0. 用語の超短い説明
+## What you will do (overview)
 
-| 言葉 | 意味 |
-|------|------|
-| **ターミナル** | 黒い画面にコマンドを打ち込むアプリ（macOS なら「ターミナル」） |
-| **リポジトリ** | GitHub 上のプロジェクト一式。clone すると自分の PC にコピーされる |
-| **clone** | インターネット上のプログラムを、自分の PC にダウンロードすること |
-| **重み (`best.pt`)** | 学習済みモデルのファイル。これがないと推論（追跡）できない |
-| **仮想環境 (`.venv`)** | このプロジェクト専用の Python 置き場。他の実験と混ざらない |
+1. Install **Git** and **uv** (a convenient Python installer) on your computer  
+2. **`git clone`** the DOLO program from GitHub  
+3. Download **`best.pt` (model weights)** and **`test_movie.mov` (demo video)** from Zenodo  
+4. Place those files in the correct location inside the cloned folder  
+5. Install dependencies and open the browser UI with **`dolo gui`**
 
-コマンドは **1行ずつ**コピーして Enter で実行してください。エラーが出たら、その全文を控えて相談すると早いです。
+Time estimate: about 15–40 minutes the first time (network and machine dependent).  
+`best.pt` is about **120 MB**.
+
+Supported OS: **macOS** or **Linux** (Windows is not supported yet; WSL2 is at your own risk).
 
 ---
 
-## 1. Git を入れる（まだの人だけ）
+## 0. Tiny glossary
+
+| Term | Meaning |
+|------|---------|
+| **Terminal** | App where you type commands (on macOS: Terminal) |
+| **Repository** | The project on GitHub; cloning copies it to your PC |
+| **clone** | Download the project from the internet to your computer |
+| **Weights (`best.pt`)** | Trained model file — required for tracking |
+| **Virtual environment (`.venv`)** | A project-local Python install that will not mix with other projects |
+
+Copy commands **one line at a time** and press Enter. If something fails, save the full error text.
+
+---
+
+## 1. Install Git (only if needed)
 
 ### macOS
 
-ターミナルを開き、次を実行します。
+Open Terminal and run:
 
 ```bash
 git --version
 ```
 
-`git version ...` と出れば OK です。  
-「Command Line Developer Tools を入れますか？」と聞かれたら **Install** を選び、終わってからもう一度同じコマンドを実行してください。
+If you see `git version ...`, you are done.  
+If macOS asks to install Command Line Developer Tools, click **Install**, then run the same command again.
 
-Homebrew を使う場合の例:
+With Homebrew:
 
 ```bash
 brew install git
 ```
 
-### Linux（Ubuntu の例）
+### Linux (Ubuntu example)
 
 ```bash
 sudo apt update
@@ -70,9 +74,9 @@ git --version
 
 ---
 
-## 2. DOLO を `git clone` する
+## 2. `git clone` DOLO
 
-好きな作業フォルダに移動してから、次を実行します（例はホーム直下）。
+Move to a folder you like (home directory example), then:
 
 ```bash
 cd ~
@@ -80,52 +84,52 @@ git clone https://github.com/masa10223/DOLO.git
 cd DOLO
 ```
 
-成功すると、`DOLO` というフォルダができ、その中にプログラム一式があります。  
-以降のコマンドは、**必ずこの `DOLO` フォルダの中**で実行してください。
+This creates a `DOLO` folder with the full project.  
+Run later commands **from inside this `DOLO` folder**.
 
-今どこにいるか確認するコマンド:
+Check where you are:
 
 ```bash
 pwd
 ls
 ```
 
-`pwd` の末尾が `.../DOLO` で、`ls` に `README.md` や `dolo` が見えれば正しい場所です。
+`pwd` should end with `.../DOLO`, and `ls` should show `README.md` and `dolo`.
 
-> **更新したいとき（2回目以降）**  
-> 同じフォルダで `git pull` とすると、GitHub 上の新しい変更を取り込めます。
+> **Updating later**  
+> In the same folder, run `git pull` to fetch newer changes from GitHub.
 
 ---
 
-## 3. Zenodo から重みと試し用動画をダウンロードする
+## 3. Download weights and the demo video from Zenodo
 
-モデルの重みは GitHub には入れていません（ファイルが大きいため）。  
-次の Zenodo レコードからダウンロードしてください。
+Model weights are **not** stored on GitHub (the file is too large).  
+Download them from this Zenodo record:
 
 - DOI: **[10.5281/zenodo.21951363](https://doi.org/10.5281/zenodo.21951363)**  
-- ページ: https://doi.org/10.5281/zenodo.21951363  
-- 入っているファイル:
-  - **`best.pt`** … 標準の学習済み重み（必須）
-  - **`test_movie.mov`** … 動作確認用の短い動画（推奨）
+- Page: https://doi.org/10.5281/zenodo.21951363  
+- Files included:
+  - **`best.pt`** — default trained weights (**required**)
+  - **`test_movie.mov`** — short demo video (**recommended**)
 
-### ブラウザでの手順（推奨）
+### Browser steps (recommended)
 
-1. 上の DOI リンクをブラウザで開く  
-2. ページ内の **Files**（ファイル一覧）を探す  
-3. `best.pt` の横のダウンロードボタンを押す（約 120 MB）  
-4. 同じく `test_movie.mov` もダウンロードする（約 1.2 MB）  
-5. ダウンロード先は、多くの場合「ダウンロード」フォルダです
+1. Open the DOI link above  
+2. Find **Files** on the page  
+3. Download `best.pt` (~120 MB)  
+4. Download `test_movie.mov` (~1.2 MB)  
+5. Files usually land in your Downloads folder
 
-### ファイルの置き場所（ここが一番大事）
+### Where to put the files (most important step)
 
-Finder（またはファイルマネージャ）で、clone した `DOLO` フォルダを開きます。
+Open the cloned `DOLO` folder in Finder / your file manager.
 
-| ダウンロードしたファイル | 置く場所 | 完成イメージ |
-|--------------------------|----------|----------------|
-| `best.pt` | **`DOLO` フォルダの直下**（`README.md` と同じ階層） | `DOLO/best.pt` |
-| `test_movie.mov` | 同じ直下で OK（好きな場所でも可） | `DOLO/test_movie.mov` |
+| Downloaded file | Put it here | Final path |
+|-----------------|-------------|------------|
+| `best.pt` | **Top level of `DOLO`** (same level as `README.md`) | `DOLO/best.pt` |
+| `test_movie.mov` | Same top level is fine | `DOLO/test_movie.mov` |
 
-ターミナルで確認する例（macOS、ダウンロードフォルダから移す場合）:
+Terminal example (macOS, moving from Downloads):
 
 ```bash
 cd ~/DOLO
@@ -134,48 +138,46 @@ mv ~/Downloads/test_movie.mov .
 ls -lh best.pt test_movie.mov
 ```
 
-`best.pt` がだいたい **120M** 前後と表示されれば成功です。
+If `best.pt` shows roughly **120M**, placement succeeded.
 
-> **置かないとどうなる？**  
-> GUI は起動できても、「モデルが必要です」と出たり、推論を開始できません。  
-> `dolo doctor` でモデルが見つかるか確認できます。
+> **If you skip this**  
+> The GUI may start, but tracking will not run until a model is found.  
+> Check with `dolo doctor`.
 
-別の置き方（上級者向け）:
+Advanced options:
 
-- `models/default.pt` として置く  
-- または環境変数 `DOLO_MODEL_PATH=/絶対パス/best.pt` を設定する  
+- place as `models/default.pt`, or  
+- set `DOLO_MODEL_PATH=/absolute/path/to/best.pt`
 
 ---
 
-## 4. uv（Python 環境用ツール）を入れる
+## 4. Install uv
 
-DOLO では [uv](https://docs.astral.sh/uv/) を使って Python とライブラリを入れます。
+DOLO uses [uv](https://docs.astral.sh/uv/) to install Python and libraries.
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-表示に従ってターミナルを開き直すか、指示された `source ...` を実行したあと:
+Restart the terminal (or run the `source ...` line the installer prints), then:
 
 ```bash
 uv --version
 ```
 
-バージョンが出れば OK です。
-
-macOS で Homebrew を使う場合:
+On macOS with Homebrew:
 
 ```bash
 brew install uv
 ```
 
-Windows など他環境は [uv の公式インストール手順](https://docs.astral.sh/uv/getting-started/installation/) を参照してください。
+Other platforms: [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 ---
 
-## 5. DOLO をインストールする
+## 5. Install DOLO
 
-`DOLO` フォルダにいることを確認してから:
+From the `DOLO` folder:
 
 ```bash
 cd ~/DOLO
@@ -184,11 +186,11 @@ uv venv --python 3.10
 source .venv/bin/activate
 ```
 
-プロンプトの先頭に `(.venv)` が付けば、仮想環境に入れています。
+A `(.venv)` prefix in the prompt means the virtual environment is active.
 
-次に、OS に合わせて **どちらか一方** を実行します。
+Then run **one** of the following blocks.
 
-**macOS（Apple Silicon / Intel）:**
+**macOS (Apple Silicon / Intel):**
 
 ```bash
 uv pip install -r requirements/lock-macos.txt
@@ -196,7 +198,7 @@ uv pip install -r requirements/gui.in
 uv pip install --no-deps -e .
 ```
 
-**NVIDIA GPU 付き Linux サーバー:**
+**NVIDIA Linux server:**
 
 ```bash
 uv pip install -r requirements/lock-linux.txt
@@ -204,23 +206,23 @@ uv pip install -r requirements/gui.in
 uv pip install --no-deps -e .
 ```
 
-初回は数分かかることがあります。
+The first install can take several minutes.
 
-### 動作チェック
+### Sanity check
 
 ```bash
 dolo doctor
 ```
 
-`READY` と出れば準備完了です。  
-`SETUP REQUIRED` の場合は、表示された不足項目（特に `best.pt` の有無）を直してください。
+`READY` means you are set.  
+If you see `SETUP REQUIRED`, fix the listed items (especially missing `best.pt`).
 
-> ターミナルを閉じて開き直したあと、もう一度 GUI を使うときは、毎回まず次を実行します。  
+> After closing the terminal, activate again before using the GUI:  
 > `cd ~/DOLO` → `source .venv/bin/activate`
 
 ---
 
-## 6. GUI を起動して試す
+## 6. Launch the GUI and try a run
 
 ```bash
 cd ~/DOLO
@@ -228,90 +230,90 @@ source .venv/bin/activate
 dolo gui
 ```
 
-ブラウザが開かない場合は、自分で次を開きます:  
+If the browser does not open, go to:  
 http://127.0.0.1:8080
 
-1. 画面の案内に従い、動画を選ぶ（試しなら `test_movie.mov`）  
-2. 既定モデルに `best.pt` が見えているか確認する  
-3. **推論を開始** を押す  
+1. Choose a video (`test_movie.mov` for a first try)  
+2. Confirm the default model shows `best.pt`  
+3. Press **Start inference** / **推論を開始**  
 
-結果は `.dolo/runs/` の下に保存されます（軌跡 CSV、任意で動画 / GIF、設定の控えなど）。
+Outputs are saved under `.dolo/runs/` (trajectory CSV, optional video/GIF, run metadata).
 
-### うまくいかないとき
+### Troubleshooting
 
-**ポート 8080 が使われている**
+**Port 8080 already in use**
 
 ```text
 address already in use
 ```
 
-別ポートで起動します。
+Use another port:
 
 ```bash
 dolo gui --port 8090
 ```
 
-ブラウザでは http://127.0.0.1:8090 を開きます。
+Then open http://127.0.0.1:8090
 
-**モデルが見つからない**
+**Model not found**
 
-- `DOLO/best.pt` があるか、もう一度確認する  
-- または明示指定: `dolo gui --model /フルパス/best.pt`
+- Confirm `DOLO/best.pt` exists, or  
+- pass an explicit path: `dolo gui --model /full/path/best.pt`
 
-**止めるとき**
+**Stop the GUI**
 
-GUI を起動したターミナルで `Ctrl+C` を押します。
+Press `Ctrl+C` in the terminal where it is running.
 
-より詳しい GUI / サーバー運用は [docs/GUI.md](docs/GUI.md)、環境の細部は [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) を参照してください。
+More detail: [docs/GUI.md](docs/GUI.md), [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
 
-> GUI は標準では自分の PC の中（`127.0.0.1`）だけに開きます。インターネットにむき出しで公開しないでください。
-
----
-
-## できること（概要）
-
-- **ブラウザ GUI** … 動画アップロード、追跡、進捗確認、結果ダウンロード  
-- **手動アノテーション連携** … head / mid / tail の CSV ラベル  
-- **学習パイプライン** … 動画ごとの fine-tune、複数動画の foundation 学習（上級）  
-- **追跡結果の解析** … 接触・相互作用などの下流解析スクリプト  
-
-学習や大規模バッチは GPU サーバー向けです。まずは GUI + `test_movie.mov` で流れを掴むのがおすすめです。
+> By default the GUI listens only on your machine (`127.0.0.1`). Do not expose it to the public internet.
 
 ---
 
-## よくある質問
+## Features (short)
 
-**Q. `best.pt` を GitHub に上げればよくない？**  
-A. GitHub は大きなファイル（特に 100 MB 超）を通常の方法では扱えません。そのため Zenodo に置いています。
+- **Browser GUI** — upload, track, monitor, download results  
+- **Manual annotation hooks** — head / mid / tail CSV labels  
+- **Training pipelines** — per-video fine-tune and multi-video foundation training (advanced)  
+- **Downstream analysis scripts** — contacts / interactions, etc.
 
-**Q. clone したのに `best.pt` が無い**  
-A. 仕様です。Zenodo から別途ダウンロードして、`DOLO` 直下に置いてください。
-
-**Q. 自分の実験動画で使いたい**  
-A. GUI で自分の動画を選べます。撮影条件が大きく違う場合は、追加の学習（fine-tune）が必要になることがあります。
-
-**Q. 開発者が変更を送るとき、どのブランチ？**  
-A. 作業中は **`dev`** 向けに PR。安定版だけ **`main`**。迷ったら `dev` です。詳細は下の「開発者向け」へ。
+Training and large batches belong on a GPU server. Start with the GUI + `test_movie.mov`.
 
 ---
 
-## 開発者向け（短く）
+## FAQ
+
+**Q. Why not put `best.pt` on GitHub?**  
+A. GitHub rejects ordinary pushes of very large files (especially over 100 MB). We host them on Zenodo.
+
+**Q. I cloned the repo but there is no `best.pt`**  
+A. Expected. Download it from Zenodo and place it at the top of `DOLO`.
+
+**Q. Can I use my own experimental videos?**  
+A. Yes, select them in the GUI. Very different imaging conditions may need fine-tuning.
+
+**Q. Which branch should developers target?**  
+A. Open PRs into **`dev`** while actively developing; promote to **`main`** when stable. If unsure, use `dev`.
+
+---
+
+## For developers (short)
 
 ```
-feature/*  →  PR →  dev  →  (安定したら)  main
+feature/*  →  PR →  dev  →  (when stable)  main
 ```
 
-大きな成果物（動画・アノテーション・`*.pt`）は `.gitignore` 対象です。コミットしないでください。
+Do not commit large artifacts (videos, annotations, `*.pt`); they are gitignored.
 
-レガシーな学習・推論スクリプトは `scripts/` 以下にあります。パッケージ化された API / GUI は `dolo/` です。
+Legacy training/inference scripts live under `scripts/`. The packaged API / GUI live under `dolo/`.
 
 ---
 
 ## Citation
 
-公表時には関連原稿を引用し、[Ultralytics YOLO](https://github.com/ultralytics/ultralytics) の利用も明記してください。DOI / 誌面フォーマットは公開後に追記します。
+Please cite the associated manuscript when published, and acknowledge [Ultralytics YOLO](https://github.com/ultralytics/ultralytics). A DOI / journal citation will be added when available.
 
-重み・デモ動画のアーカイブ:
+Model weights and demo video archive:
 
 > Tsutsumi, M. (2026). Test movie and pre-trained model weight for DOLO. Zenodo.  
 > https://doi.org/10.5281/zenodo.21951363
@@ -321,8 +323,8 @@ feature/*  →  PR →  dev  →  (安定したら)  main
 ## Copyright and license
 
 Copyright © 2024–2026 **Masato Tsutsumi**.  
-ソースコードとオリジナル文書は **AGPL-3.0-or-later**（[LICENSE](LICENSE)）です。  
-第三者ソフト・モデル重み・データセット・論文・商標は、それぞれの権利に従います。
+Source code and original documentation are **AGPL-3.0-or-later** ([LICENSE](LICENSE)).  
+Third-party software, model weights, datasets, publications, and trademarks remain under their own terms.
 
-ソフトウェア設計・実装: **Masato Tsutsumi** ([mtsutsumi@nagoya-u.jp](mailto:mtsutsumi@nagoya-u.jp))  
-近況: [研究ページ](https://masa10223.github.io/en/)
+Software design and implementation: **Masato Tsutsumi** ([mtsutsumi@nagoya-u.jp](mailto:mtsutsumi@nagoya-u.jp))  
+Updates: [research page](https://masa10223.github.io/en/)
